@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PANEL MASK CONSOLE — パネル開けメーカー（100分割 ON/OFF版）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#12151a;
+    --panel:#1b1f27;
+    --panel-alt:#20252e;
+    --line:#2a303b;
+    --line-soft:#232833;
+    --text:#e8ebf0;
+    --text-dim:#8891a1;
+    --accent:#f5a623;
+    --accent-soft:rgba(245,166,35,.16);
+    --complete:#37d67a;
+    --complete-soft:rgba(55,214,122,.16);
+    --rec:#ff4545;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1200px 600px at 15% -10%, #171b22 0%, transparent 60%),
+      var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    padding:28px 20px 60px;
+  }
+  .wrap{max-width:1180px;margin:0 auto;}
+
+  /* ---------- Header ---------- */
+  header.top{
+    display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+    margin-bottom:22px;
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:16px 18px;
+    box-shadow:0 20px 50px -25px rgba(0,0,0,.7), inset 0 0 0 1px rgba(255,255,255,.02);
+  }
+  .brand{display:flex;align-items:center;gap:12px;}
+  .rec-dot{width:11px;height:11px;border-radius:50%;background:var(--rec);box-shadow:0 0 10px 1px var(--rec);animation:blink 1.4s ease-in-out infinite;flex-shrink:0;}
+  .rec-dot.complete{background:var(--complete);box-shadow:0 0 10px 1px var(--complete);animation:none;}
+  @keyframes blink{0%,100%{opacity:1;}50%{opacity:.25;}}
+  h1{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:26px;letter-spacing:.04em;text-transform:uppercase;margin:0;line-height:1;}
+  h1 span{color:var(--accent);}
+  .tagline{font-size:12px;color:var(--text-dim);letter-spacing:.03em;margin-top:3px;}
+  .status-text{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.05em;color:var(--text-dim);text-transform:uppercase;}
+  .status-text.complete{color:var(--complete);}
+
+  /* ---------- Monitor (hero) ---------- */
+  .monitor{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 14px 16px;box-shadow:0 20px 50px -25px rgba(0,0,0,.7), inset 0 0 0 1px rgba(255,255,255,.02);margin-bottom:20px;}
+  .monitor-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:2px 4px 12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);letter-spacing:.06em;}
+  .monitor-actions{display:flex;align-items:center;gap:8px;}
+  .monitor-actions select{width:auto;min-width:0;padding:6px 8px;font-size:11px;}
+  .btn-sm{padding:6px 12px;font-size:11px;border-radius:6px;letter-spacing:.02em;}
+  .screen{
+    position:relative;border-radius:8px;overflow:hidden;
+    background:repeating-linear-gradient(45deg,#0d0f13,#0d0f13 10px,#111319 10px,#111319 20px);
+    border:1px solid var(--line-soft);min-height:320px;display:flex;
+    align-items:center;justify-content:center;
+    touch-action:none;overscroll-behavior:contain;
+  }
+  .screen::after{
+    content:'';position:absolute;inset:0;pointer-events:none;z-index:5;
+    background:repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,.18) 3px);
+    mix-blend-mode:overlay;opacity:.55;
+  }
+  .placeholder{margin:auto;text-align:center;color:var(--text-dim);font-family:'JetBrains Mono',monospace;font-size:13px;letter-spacing:.08em;padding:60px 20px;}
+  .placeholder b{display:block;color:var(--text);font-family:'Barlow Condensed',sans-serif;font-size:22px;letter-spacing:.06em;margin-bottom:6px;text-transform:uppercase;}
+
+  .stage-wrap{position:relative;width:100%;margin:0 auto;display:none;touch-action:none;overscroll-behavior:contain;user-select:none;-webkit-user-select:none;}
+  .stage-wrap.size-small{max-width:320px;}
+  .stage-wrap.size-medium{max-width:640px;}
+  .stage-wrap.size-large{max-width:none;}
+  .stage-wrap canvas{position:relative;width:100%;height:100%;display:block;touch-action:none;cursor:pointer;}
+
+  .toast{
+    position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
+    background:rgba(255,69,69,.15);border:1px solid var(--rec);color:#ffb3b3;
+    font-size:11px;font-family:'JetBrains Mono',monospace;letter-spacing:.03em;
+    padding:6px 12px;border-radius:20px;z-index:8;opacity:0;transition:opacity .2s ease;pointer-events:none;
+  }
+  .toast.show{opacity:1;}
+
+  /* ---------- Deck (controls) ---------- */
+  .deck{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px 20px;margin-bottom:20px;}
+  .deck-row{display:flex;flex-wrap:wrap;gap:22px;align-items:flex-end;}
+  .field-group{display:flex;flex-direction:column;gap:6px;}
+  .field-group label{font-family:'Barlow Condensed',sans-serif;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);}
+  .file-btn{display:inline-flex;align-items:center;gap:8px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);padding:9px 14px;border-radius:8px;font-size:13px;cursor:pointer;transition:border-color .15s ease;}
+  .file-btn:hover{border-color:var(--accent);}
+  .file-btn input{display:none;}
+  .file-name{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);margin-top:4px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+  select, input[type=number]{background:var(--panel-alt);border:1px solid var(--line);color:var(--text);border-radius:7px;padding:8px 10px;font-family:'JetBrains Mono',monospace;font-size:13px;width:88px;}
+  select{width:auto;min-width:170px;}
+  select:focus, input:focus{outline:2px solid var(--accent);outline-offset:1px;}
+
+  input[type=color]{
+    width:52px;height:38px;padding:2px;border-radius:8px;border:1px solid var(--line);
+    background:var(--panel-alt);cursor:pointer;
+  }
+  .color-field{display:flex;align-items:center;gap:10px;}
+  .color-hex{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);}
+
+  .btn{background:var(--accent);color:#1a1204;border:none;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;letter-spacing:.04em;text-transform:uppercase;padding:10px 18px;border-radius:8px;cursor:pointer;transition:filter .15s ease, transform .05s ease;}
+  .btn:hover{filter:brightness(1.08);}
+  .btn:active{transform:translateY(1px);}
+  .btn.ghost{background:transparent;color:var(--text-dim);border:1px solid var(--line);}
+  .btn.ghost:hover{color:var(--text);border-color:var(--text-dim);}
+  .btn:disabled{opacity:.35;cursor:not-allowed;filter:none;}
+
+  .privacy-note{display:flex;align-items:flex-start;gap:8px;margin-top:16px;padding-top:14px;border-top:1px dashed var(--line);font-size:12px;color:var(--text-dim);line-height:1.6;}
+  .privacy-note svg{flex-shrink:0;margin-top:2px;}
+  .privacy-note b{color:var(--text);}
+  header .privacy-note{margin-top:6px;padding-top:0;border-top:none;max-width:420px;}
+
+  footer{text-align:center;color:var(--text-dim);font-size:11px;margin-top:26px;font-family:'JetBrains Mono',monospace;letter-spacing:.03em;}
+  footer .footer-links{margin-top:10px;}
+  footer .footer-links a{color:var(--text-dim);text-decoration:underline;text-underline-offset:2px;}
+  footer .footer-links a:hover{color:var(--accent);}
+  footer .copyright{margin-top:6px;opacity:.7;}
+
+  @media (max-width:640px){
+    .deck-row{gap:14px;}
+    input[type=number]{width:72px;}
+
+    .monitor{
+      position:sticky;top:0;z-index:20;
+      margin-left:-20px;margin-right:-20px;
+      border-radius:0 0 14px 14px;
+      border-top:none;
+    }
+    .stage-wrap.size-small{max-width:260px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <span class="rec-dot" id="recDot"></span>
+      <div>
+        <h1>PANEL <span>MASK</span> CONSOLE</h1>
+        <div class="tagline">パネル開けメーカー — 100分割・ON/OFF マスクモード</div>
+        <div class="privacy-note">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8891a1" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+          <div><b>サーバー保存なし。</b> 選択した画像はこのブラウザの中だけで処理されます。どこにもアップロード・送信・保存されません。ページを閉じれば消えます。</div>
+        </div>
+      </div>
+    </div>
+    <div class="status-text" id="statusText">STANDBY — 0 / 100 OPEN</div>
+  </header>
+
+  <!-- ============ MONITOR (hero preview) ============ -->
+  <div class="monitor">
+    <div class="monitor-bar">
+      <span>MONITOR OUT</span>
+      <div class="monitor-actions">
+        <select id="previewSizeInput">
+          <option value="small" selected>表示サイズ：小</option>
+          <option value="medium">表示サイズ：中</option>
+          <option value="large">表示サイズ：大</option>
+        </select>
+        <button class="btn ghost btn-sm" id="downloadBtn">📥 画像を保存</button>
+      </div>
+    </div>
+    <div class="screen">
+      <div class="placeholder" id="placeholder">
+        <b>NO SIGNAL</b>
+        画像を選択すると、ここに100分割パネルが表示されます
+      </div>
+      <div class="stage-wrap size-small" id="stageWrap">
+        <canvas id="panelCanvas"></canvas>
+        <div class="toast" id="toast"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ DECK (image + mask settings) ============ -->
+  <div class="deck">
+    <div class="deck-row">
+      <div class="field-group">
+        <label>イラストを選択</label>
+        <label class="file-btn">
+          📁 画像ファイルを選ぶ
+          <input type="file" id="fileInput" accept="image/*">
+        </label>
+        <div class="file-name" id="fileName">未選択</div>
+      </div>
+
+      <div class="field-group">
+        <label>マスク色</label>
+        <div class="color-field">
+          <input type="color" id="maskColorInput" value="#669d34">
+          <span class="color-hex" id="maskColorHex">#669d34</span>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <button class="btn ghost" id="hideAllBtn">すべて隠す</button>
+      </div>
+
+      <div class="field-group">
+        <button class="btn ghost" id="openAllBtn">すべて開く</button>
+      </div>
+    </div>
+
+    <div class="privacy-note" style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--line);max-width:none;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8891a1" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><circle cx="12" cy="16" r=".5" fill="#8891a1"/></svg>
+      <div>パネルは左上から右下へ1〜100の番号が振られています。ビューワー上のパネルをクリック（タップ）すると、そのパネルのマスクが解除／再適用されます。</div>
+    </div>
+  </div>
+
+  <footer>
+    PANEL MASK CONSOLE — すべての処理はローカルのブラウザ内で完結します
+    <div class="footer-links"><a href="Readme.md" target="_blank" rel="noopener">規約</a></div>
+    <div class="copyright">©Kanade Mugino</div>
+  </footer>
+</div>
+
+<script>
+(() => {
+  const GRID_N = 10;
+  const TOTAL = GRID_N * GRID_N;
+  const MAX_RES = 1000;
+
+  const state = {
+    img: null,
+    W: 0, H: 0,
+    maskColor: '#669d34',
+    masked: Array(TOTAL).fill(true) // true = 隠れている（マスク中）
+  };
+
+  // ---------- DOM refs ----------
+  const fileInput = document.getElementById('fileInput');
+  const fileName = document.getElementById('fileName');
+  const maskColorInput = document.getElementById('maskColorInput');
+  const maskColorHex = document.getElementById('maskColorHex');
+  const hideAllBtn = document.getElementById('hideAllBtn');
+  const openAllBtn = document.getElementById('openAllBtn');
+  const placeholderEl = document.getElementById('placeholder');
+  const stageWrap = document.getElementById('stageWrap');
+  const canvas = document.getElementById('panelCanvas');
+  const ctx = canvas.getContext('2d');
+  const toastEl = document.getElementById('toast');
+  const statusText = document.getElementById('statusText');
+  const recDot = document.getElementById('recDot');
+  const previewSizeInput = document.getElementById('previewSizeInput');
+  const downloadBtn = document.getElementById('downloadBtn');
+
+  let toastTimer = null;
+  function clamp(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); }
+
+  function showToast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1800);
+  }
+
+  // ---------- mask color contrast ----------
+  function readableTextColor(hex){
+    const m = hex.replace('#','');
+    const r = parseInt(m.substring(0,2),16);
+    const g = parseInt(m.substring(2,4),16);
+    const b = parseInt(m.substring(4,6),16);
+    const luminance = (0.299*r + 0.587*g + 0.114*b) / 255;
+    return luminance > 0.55 ? 'rgba(10,12,16,.88)' : 'rgba(255,255,255,.92)';
+  }
+
+  // ---------- rendering ----------
+  function renderAll(){
+    if(!state.img){
+      placeholderEl.style.display = '';
+      stageWrap.style.display = 'none';
+      updateStatus();
+      return;
+    }
+    placeholderEl.style.display = 'none';
+    stageWrap.style.display = 'block';
+    stageWrap.style.aspectRatio = `${state.W} / ${state.H}`;
+
+    canvas.width = state.W;
+    canvas.height = state.H;
+    ctx.clearRect(0, 0, state.W, state.H);
+    ctx.drawImage(state.img, 0, 0, state.W, state.H);
+
+    const cellW = state.W / GRID_N;
+    const cellH = state.H / GRID_N;
+    const textColor = readableTextColor(state.maskColor);
+    const fontSize = Math.max(11, Math.round(Math.min(cellW, cellH) * 0.34));
+
+    for(let i=0; i<TOTAL; i++){
+      const row = Math.floor(i / GRID_N);
+      const col = i % GRID_N;
+      const x0 = col * cellW, y0 = row * cellH;
+
+      if(state.masked[i]){
+        ctx.fillStyle = state.maskColor;
+        ctx.fillRect(x0, y0, cellW, cellH);
+
+        ctx.fillStyle = textColor;
+        ctx.font = `700 ${fontSize}px 'JetBrains Mono', monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(String(i + 1), x0 + cellW / 2, y0 + cellH / 2);
+      }
+
+      ctx.strokeStyle = 'rgba(255,255,255,.14)';
+      ctx.lineWidth = Math.max(1, state.W / 600);
+      ctx.strokeRect(x0, y0, cellW, cellH);
+    }
+
+    updateStatus();
+  }
+
+  function updateStatus(){
+    const openCount = state.masked.filter(m => !m).length;
+    const allOpen = openCount === TOTAL;
+    statusText.textContent = allOpen
+      ? `ALL PANELS OPEN — ${openCount} / ${TOTAL}`
+      : `ON AIR — ${openCount} / ${TOTAL} OPEN`;
+    statusText.classList.toggle('complete', allOpen);
+    recDot.classList.toggle('complete', allOpen);
+  }
+
+  // ---------- click / tap to toggle a panel ----------
+  function cellIndexFromEvent(e){
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width * state.W;
+    const y = (e.clientY - rect.top) / rect.height * state.H;
+    const col = clamp(Math.floor(x / (state.W / GRID_N)), 0, GRID_N - 1);
+    const row = clamp(Math.floor(y / (state.H / GRID_N)), 0, GRID_N - 1);
+    return row * GRID_N + col;
+  }
+
+  canvas.addEventListener('pointerdown', (e) => {
+    if(!state.img) return;
+    const idx = cellIndexFromEvent(e);
+    state.masked[idx] = !state.masked[idx];
+    renderAll();
+    e.preventDefault();
+  }, { passive: false });
+
+  // ---------- mask color ----------
+  maskColorInput.addEventListener('input', () => {
+    state.maskColor = maskColorInput.value;
+    maskColorHex.textContent = maskColorInput.value;
+    if(state.img) renderAll();
+  });
+
+  // ---------- hide all / open all ----------
+  hideAllBtn.addEventListener('click', () => {
+    state.masked.fill(true);
+    renderAll();
+  });
+  openAllBtn.addEventListener('click', () => {
+    state.masked.fill(false);
+    renderAll();
+  });
+
+  // ---------- file loading ----------
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    fileName.textContent = file.name;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        state.img = img;
+        const scale = Math.min(1, MAX_RES / Math.max(img.naturalWidth, img.naturalHeight));
+        state.W = Math.round(img.naturalWidth * scale);
+        state.H = Math.round(img.naturalHeight * scale);
+        state.masked = Array(TOTAL).fill(true);
+        renderAll();
+      };
+      img.src = ev.target.result; // stays local — no network request
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // ---------- preview size ----------
+  previewSizeInput.addEventListener('change', () => {
+    stageWrap.classList.remove('size-small', 'size-medium', 'size-large');
+    stageWrap.classList.add('size-' + previewSizeInput.value);
+  });
+
+  // ---------- download as PNG (mask + numbers are already baked into the canvas) ----------
+  downloadBtn.addEventListener('click', () => {
+    if(!state.img){ showToast('先に画像を選択してください'); return; }
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const link = document.createElement('a');
+    link.download = `panel-mask_${stamp}.png`;
+    link.href = canvas.toDataURL('image/png');
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  });
+
+  // ---------- init ----------
+  renderAll();
+})();
+</script>
+</body>
+</html>
