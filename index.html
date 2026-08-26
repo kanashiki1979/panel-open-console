@@ -142,8 +142,9 @@
   header .privacy-note{margin-top:6px;padding-top:0;border-top:none;max-width:420px;}
 
   /* ---------- Console / channel strips ---------- */
-  .console-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:10px;}
+  .console-head{margin-bottom:12px;}
   .console-head h2{font-family:'Barlow Condensed',sans-serif;font-size:18px;letter-spacing:.05em;text-transform:uppercase;margin:0;color:var(--text);}
+  .console-head .tagline{margin-top:4px;}
   .channels{display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;scrollbar-color:var(--line) transparent;}
   .channels::-webkit-scrollbar{height:8px;}
   .channels::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px;}
@@ -260,14 +261,14 @@
         <label>分割方法</label>
         <select id="modeInput">
           <option value="grid">パネルモード（縦横等分）</option>
-          <option value="random">ランダム分割（斜めあり）</option>
+          <option value="random" selected>ランダム分割（斜めあり）</option>
           <option value="manual">手動で線を引く</option>
         </select>
       </div>
 
       <div class="field-group" id="countGroup">
-        <label id="countLabel">分割数（1辺）例：3→9分割</label>
-        <input type="number" id="countInput" min="1" max="5" value="3">
+        <label id="countLabel">分割数（合計 3〜10）</label>
+        <input type="number" id="countInput" min="3" max="10" value="5">
       </div>
 
       <div class="field-group" id="applyGroup">
@@ -292,7 +293,7 @@
   <div class="deck">
     <div class="console-head">
       <h2>チャンネル設定</h2>
-      <span class="tagline" style="margin:0;">項目名・上限値・現在値を入力するとモザイクがリアルタイムで動きます</span>
+      <span class="tagline">項目名・上限値・現在値を入力するとモザイクがリアルタイムで動きます</span>
     </div>
     <div class="channels" id="channels"></div>
   </div>
@@ -307,7 +308,7 @@
   const state = {
     img: null,
     W: 0, H: 0,
-    mode: 'grid',
+    mode: 'random',
     leaves: [],
     manualHistory: []
   };
