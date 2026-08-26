@@ -179,6 +179,10 @@
   .ch-numbers input{width:54px;padding:5px 6px;font-size:12px;}
 
   footer{text-align:center;color:var(--text-dim);font-size:11px;margin-top:26px;font-family:'JetBrains Mono',monospace;letter-spacing:.03em;}
+  footer .footer-links{margin-top:10px;}
+  footer .footer-links a{color:var(--text-dim);text-decoration:underline;text-underline-offset:2px;}
+  footer .footer-links a:hover{color:var(--accent);}
+  footer .copyright{margin-top:6px;opacity:.7;}
 
   @media (max-width:640px){
     .deck-row{gap:14px;}
@@ -298,7 +302,11 @@
     <div class="channels" id="channels"></div>
   </div>
 
-  <footer>PANEL OPEN CONSOLE — すべての処理はローカルのブラウザ内で完結します</footer>
+  <footer>
+    PANEL OPEN CONSOLE — すべての処理はローカルのブラウザ内で完結します
+    <div class="footer-links"><a href="Readme.md" target="_blank" rel="noopener">利用規約・免責事項</a></div>
+    <div class="copyright">©Kanade Mugino</div>
+  </footer>
 </div>
 
 <script>
@@ -637,6 +645,9 @@
 
       const labelInput = document.createElement('input');
       labelInput.className = 'ch-label';
+      labelInput.type = 'text';
+      labelInput.lang = 'ja';
+      labelInput.autocomplete = 'off';
       labelInput.value = cfg.label;
       labelInput.maxLength = 20;
       root.appendChild(labelInput);
