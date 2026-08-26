@@ -48,9 +48,10 @@
 
   /* ---------- Monitor (hero) ---------- */
   .monitor{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 14px 16px;box-shadow:0 20px 50px -25px rgba(0,0,0,.7), inset 0 0 0 1px rgba(255,255,255,.02);margin-bottom:20px;}
-  .monitor-bar{display:flex;align-items:center;justify-content:space-between;padding:2px 4px 12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);letter-spacing:.06em;}
-  .monitor-bar .dot-row{display:flex;gap:6px;}
-  .monitor-bar .dot-row span{width:8px;height:8px;border-radius:50%;background:var(--line);display:inline-block;}
+  .monitor-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:2px 4px 12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);letter-spacing:.06em;}
+  .monitor-actions{display:flex;align-items:center;gap:8px;}
+  .monitor-actions select{width:auto;min-width:0;padding:6px 8px;font-size:11px;}
+  .btn-sm{padding:6px 12px;font-size:11px;border-radius:6px;letter-spacing:.02em;}
   .screen{
     position:relative;border-radius:8px;overflow:hidden;
     background:repeating-linear-gradient(45deg,#0d0f13,#0d0f13 10px,#111319 10px,#111319 20px);
@@ -66,6 +67,10 @@
   .placeholder b{display:block;color:var(--text);font-family:'Barlow Condensed',sans-serif;font-size:22px;letter-spacing:.06em;margin-bottom:6px;text-transform:uppercase;}
 
   .stage-wrap{position:relative;width:100%;margin:0 auto;display:none;touch-action:none;overscroll-behavior:contain;user-select:none;-webkit-user-select:none;}
+  .stage-wrap.size-small{max-width:320px;}
+  .stage-wrap.size-medium{max-width:640px;}
+  .stage-wrap.size-large{max-width:none;}
+  .screen{align-items:center;justify-content:center;}
   .stage-wrap canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;}
   #mainCanvas{position:relative;}
   #drawCanvas{cursor:crosshair;}
@@ -197,14 +202,21 @@
   <div class="monitor">
     <div class="monitor-bar">
       <span>MONITOR OUT</span>
-      <div class="dot-row"><span></span><span></span><span></span></div>
+      <div class="monitor-actions">
+        <select id="previewSizeInput">
+          <option value="small" selected>表示サイズ：小</option>
+          <option value="medium">表示サイズ：中</option>
+          <option value="large">表示サイズ：大</option>
+        </select>
+        <button class="btn ghost btn-sm" id="downloadBtn">📥 画像を保存</button>
+      </div>
     </div>
     <div class="screen">
       <div class="placeholder" id="placeholder">
         <b>NO SIGNAL</b>
         画像を選択すると、ここにパネルが表示されます
       </div>
-      <div class="stage-wrap" id="stageWrap">
+      <div class="stage-wrap size-small" id="stageWrap">
         <canvas id="mainCanvas"></canvas>
         <canvas id="drawCanvas"></canvas>
         <div class="labels-layer" id="labelsLayer"></div>
@@ -320,6 +332,8 @@
   const toastEl = document.getElementById('toast');
   const statusText = document.getElementById('statusText');
   const recDot = document.getElementById('recDot');
+  const previewSizeInput = document.getElementById('previewSizeInput');
+  const downloadBtn = document.getElementById('downloadBtn');
 
   const mainCtx = mainCanvas.getContext('2d');
   const drawCtx = drawCanvas.getContext('2d');
@@ -1000,6 +1014,82 @@
       img.src = ev.target.result; // stays local — no network request
     };
     reader.readAsDataURL(file);
+  });
+
+  // ---------- preview size ----------
+  previewSizeInput.addEventListener('change', () => {
+    stageWrap.classList.remove('size-small', 'size-medium', 'size-large');
+    stageWrap.classList.add('size-' + previewSizeInput.value);
+  });
+
+  // ---------- download as PNG (bakes in labels/percentages) ----------
+  async function buildExportCanvas(){
+    if(document.fonts && document.fonts.ready){
+      try{ await document.fonts.ready; } catch(err){ /* ignore */ }
+    }
+    const exp = document.createElement('canvas');
+    exp.width = state.W; exp.height = state.H;
+    const ctx = exp.getContext('2d');
+    ctx.drawImage(mainCanvas, 0, 0);
+
+    state.leaves.forEach(leaf => {
+      const cfg = leaf.config;
+      const [cx, cy] = centroidOf(leaf.poly);
+      const pct = percentOf(cfg);
+      const complete = pct >= 100;
+      const nameFontSize = Math.max(12, Math.round(state.W * 0.024));
+      const pctFontSize = Math.max(10, Math.round(state.W * 0.018));
+      const nameText = cfg.label;
+      const pctText = `${Math.round(cfg.current)}/${Math.round(cfg.target)} ・ ${Math.round(pct)}%`;
+
+      ctx.font = `700 ${nameFontSize}px 'Barlow Condensed', sans-serif`;
+      const nameWidth = ctx.measureText(nameText).width;
+      ctx.font = `500 ${pctFontSize}px 'JetBrains Mono', monospace`;
+      const pctWidth = ctx.measureText(pctText).width;
+
+      const padX = 10, padY = 8, gap = 4;
+      const boxW = Math.max(nameWidth, pctWidth) + padX * 2;
+      const boxH = nameFontSize + pctFontSize + gap + padY * 2;
+      const boxX = cx - boxW / 2, boxY = cy - boxH / 2;
+      const r = 6;
+
+      ctx.beginPath();
+      ctx.moveTo(boxX + r, boxY);
+      ctx.arcTo(boxX + boxW, boxY, boxX + boxW, boxY + boxH, r);
+      ctx.arcTo(boxX + boxW, boxY + boxH, boxX, boxY + boxH, r);
+      ctx.arcTo(boxX, boxY + boxH, boxX, boxY, r);
+      ctx.arcTo(boxX, boxY, boxX + boxW, boxY, r);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(8,10,13,0.78)';
+      ctx.fill();
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = complete ? '#37d67a' : 'rgba(255,255,255,0.18)';
+      ctx.stroke();
+
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = '#e8ebf0';
+      ctx.font = `700 ${nameFontSize}px 'Barlow Condensed', sans-serif`;
+      ctx.fillText(nameText, cx, boxY + padY);
+
+      ctx.fillStyle = complete ? '#37d67a' : '#f5a623';
+      ctx.font = `500 ${pctFontSize}px 'JetBrains Mono', monospace`;
+      ctx.fillText(pctText, cx, boxY + padY + nameFontSize + gap);
+    });
+
+    return exp;
+  }
+
+  downloadBtn.addEventListener('click', async () => {
+    if(!state.img){ showToast('先に画像を選択してください'); return; }
+    const canvas = await buildExportCanvas();
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const link = document.createElement('a');
+    link.download = `panel-open_${stamp}.png`;
+    link.href = canvas.toDataURL('image/png');
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
   });
 
   // ---------- init ----------
