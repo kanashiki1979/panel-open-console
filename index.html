@@ -139,6 +139,7 @@
   .privacy-note{display:flex;align-items:flex-start;gap:8px;margin-top:16px;padding-top:14px;border-top:1px dashed var(--line);font-size:12px;color:var(--text-dim);line-height:1.6;}
   .privacy-note svg{flex-shrink:0;margin-top:2px;}
   .privacy-note b{color:var(--text);}
+  header .privacy-note{margin-top:6px;padding-top:0;border-top:none;max-width:420px;}
 
   /* ---------- Console / channel strips ---------- */
   .console-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:10px;}
@@ -147,7 +148,7 @@
   .channels::-webkit-scrollbar{height:8px;}
   .channels::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px;}
 
-  .channel{flex:0 0 148px;background:var(--panel-alt);border:1px solid var(--line);border-radius:10px;padding:12px 10px 14px;display:flex;flex-direction:column;align-items:center;gap:10px;transition:border-color .2s ease;}
+  .channel{flex:0 0 115px;background:var(--panel-alt);border:1px solid var(--line);border-radius:10px;padding:12px 10px 14px;display:flex;flex-direction:column;align-items:center;gap:10px;transition:border-color .2s ease;}
   .channel.complete{border-color:var(--complete);}
   .ch-index{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:.1em;align-self:flex-start;}
   .ch-label{width:100%;background:transparent;border:none;border-bottom:1px solid var(--line);color:var(--text);font-family:'Barlow Condensed',sans-serif;font-size:15px;text-align:center;padding:2px 2px 5px;letter-spacing:.02em;}
@@ -155,14 +156,14 @@
 
   .fader-row{display:flex;align-items:flex-end;gap:8px;height:130px;}
   .fader-track{
-    position:relative;width:34px;height:130px;
+    position:relative;width:24px;height:130px;
     background:var(--panel);border:1px solid var(--line);border-radius:6px;
     overflow:visible;cursor:pointer;touch-action:none;
   }
   .fader-track .fill{position:absolute;left:0;right:0;bottom:0;border-radius:0 0 5px 5px;background:linear-gradient(to top, var(--accent), #ffd27a);pointer-events:none;}
   .channel.complete .fader-track .fill{background:linear-gradient(to top, var(--complete), #9dfcc4);}
   .fader-track .thumb{
-    position:absolute;left:-4px;right:-4px;height:14px;
+    position:absolute;left:-3px;right:-3px;height:14px;
     background:#fff;border:2px solid var(--accent);border-radius:4px;
     transform:translateY(50%);pointer-events:none;
     box-shadow:0 1px 4px rgba(0,0,0,.5);
@@ -174,13 +175,21 @@
   .ch-numbers{display:flex;flex-direction:column;gap:6px;width:100%;}
   .ch-numbers .row{display:flex;align-items:center;justify-content:space-between;gap:6px;}
   .ch-numbers label{font-size:10px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;letter-spacing:.04em;}
-  .ch-numbers input{width:62px;padding:5px 6px;font-size:12px;}
+  .ch-numbers input{width:54px;padding:5px 6px;font-size:12px;}
 
   footer{text-align:center;color:var(--text-dim);font-size:11px;margin-top:26px;font-family:'JetBrains Mono',monospace;letter-spacing:.03em;}
 
   @media (max-width:640px){
     .deck-row{gap:14px;}
     input[type=number]{width:72px;}
+
+    .monitor{
+      position:sticky;top:0;z-index:20;
+      margin-left:-20px;margin-right:-20px;
+      border-radius:0 0 14px 14px;
+      border-top:none;
+    }
+    .stage-wrap.size-small{max-width:260px;}
   }
 </style>
 </head>
@@ -193,6 +202,10 @@
       <div>
         <h1>PANEL <span>OPEN</span> CONSOLE</h1>
         <div class="tagline">パネル開けメーカー — 画像分割 &amp; モザイク解除ツール</div>
+        <div class="privacy-note">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8891a1" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+          <div><b>サーバー保存なし。</b> 選択した画像はこのブラウザの中だけで処理されます。どこにもアップロード・送信・保存されません。ページを閉じれば消えます。</div>
+        </div>
       </div>
     </div>
     <div class="status-text" id="statusText">STANDBY — 0 / 0 OPEN</div>
@@ -272,11 +285,6 @@
       <div class="field-group">
         <button class="btn ghost" id="resetValuesBtn">現在値を全て0にリセット</button>
       </div>
-    </div>
-
-    <div class="privacy-note">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8891a1" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-      <div><b>サーバー保存なし。</b> 選択した画像はこのブラウザの中だけで処理されます。どこにもアップロード・送信・保存されません。ページを閉じれば消えます。</div>
     </div>
   </div>
 
