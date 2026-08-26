@@ -395,15 +395,24 @@
   });
 
   // ---------- download as PNG (mask + numbers are already baked into the canvas) ----------
+  function downloadCanvasAsPng(targetCanvas, filename){
+    targetCanvas.toBlob(function (blob) {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 'image/png');
+  }
+
   downloadBtn.addEventListener('click', () => {
     if(!state.img){ showToast('先に画像を選択してください'); return; }
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const link = document.createElement('a');
-    link.download = `panel-mask_${stamp}.png`;
-    link.href = canvas.toDataURL('image/png');
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+    downloadCanvasAsPng(canvas, `panel-mask_${stamp}.png`);
   });
 
   // ---------- init ----------
