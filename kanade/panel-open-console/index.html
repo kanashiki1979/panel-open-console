@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PANEL OPEN CONSOLE — パネル開けメーカー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#12151a;
+    --panel:#1b1f27;
+    --panel-alt:#20252e;
+    --line:#2a303b;
+    --line-soft:#232833;
+    --text:#e8ebf0;
+    --text-dim:#8891a1;
+    --accent:#f5a623;
+    --accent-soft:rgba(245,166,35,.16);
+    --complete:#37d67a;
+    --complete-soft:rgba(55,214,122,.16);
+    --rec:#ff4545;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1200px 600px at 15% -10%, #171b22 0%, transparent 60%),
+      var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    padding:28px 20px 60px;
+  }
+  .wrap{max-width:1180px;margin:0 auto;}
+
+  /* ---------- Header ---------- */
+  header.top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:22px;}
+  .brand{display:flex;align-items:center;gap:12px;}
+  .rec-dot{width:11px;height:11px;border-radius:50%;background:var(--rec);box-shadow:0 0 10px 1px var(--rec);animation:blink 1.4s ease-in-out infinite;flex-shrink:0;}
+  .rec-dot.complete{background:var(--complete);box-shadow:0 0 10px 1px var(--complete);animation:none;}
+  @keyframes blink{0%,100%{opacity:1;}50%{opacity:.25;}}
+  h1{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:26px;letter-spacing:.04em;text-transform:uppercase;margin:0;line-height:1;}
+  h1 span{color:var(--accent);}
+  .tagline{font-size:12px;color:var(--text-dim);letter-spacing:.03em;margin-top:3px;}
+  .status-text{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.05em;color:var(--text-dim);text-transform:uppercase;}
+  .status-text.complete{color:var(--complete);}
+
+  /* ---------- Monitor (hero) ---------- */
+  .monitor{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 14px 16px;box-shadow:0 20px 50px -25px rgba(0,0,0,.7), inset 0 0 0 1px rgba(255,255,255,.02);margin-bottom:20px;}
+  .monitor-bar{display:flex;align-items:center;justify-content:space-between;padding:2px 4px 12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);letter-spacing:.06em;}
+  .monitor-bar .dot-row{display:flex;gap:6px;}
+  .monitor-bar .dot-row span{width:8px;height:8px;border-radius:50%;background:var(--line);display:inline-block;}
+  .screen{
+    position:relative;border-radius:8px;overflow:hidden;
+    background:repeating-linear-gradient(45deg,#0d0f13,#0d0f13 10px,#111319 10px,#111319 20px);
+    border:1px solid var(--line-soft);min-height:320px;display:flex;
+    touch-action:none;overscroll-behavior:contain;
+  }
+  .screen::after{
+    content:'';position:absolute;inset:0;pointer-events:none;z-index:5;
+    background:repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,.18) 3px);
+    mix-blend-mode:overlay;opacity:.55;
+  }
+  .placeholder{margin:auto;text-align:center;color:var(--text-dim);font-family:'JetBrains Mono',monospace;font-size:13px;letter-spacing:.08em;padding:60px 20px;}
+  .placeholder b{display:block;color:var(--text);font-family:'Barlow Condensed',sans-serif;font-size:22px;letter-spacing:.06em;margin-bottom:6px;text-transform:uppercase;}
+
+  .stage-wrap{position:relative;width:100%;margin:0 auto;display:none;touch-action:none;overscroll-behavior:contain;user-select:none;-webkit-user-select:none;}
+  .stage-wrap canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;}
+  #mainCanvas{position:relative;}
+  #drawCanvas{cursor:crosshair;}
+  .labels-layer{position:absolute;inset:0;pointer-events:none;}
+  .leaf-label{
+    position:absolute;transform:translate(-50%,-50%);
+    background:rgba(8,10,13,.74);border:1px solid rgba(255,255,255,.1);
+    border-radius:6px;padding:4px 8px;text-align:center;
+    font-family:'Barlow Condensed',sans-serif;letter-spacing:.03em;
+    pointer-events:auto;
+  }
+  .leaf-label .lname{
+    font-size:12px;text-transform:uppercase;color:var(--text);line-height:1.2;
+    white-space:nowrap;min-width:1ch;
+    border-bottom:1px dashed rgba(255,255,255,.3);
+    cursor:text;outline:none;padding:0 1px;
+  }
+  .leaf-label .lname:focus{
+    border-bottom-color:var(--accent);background:rgba(245,166,35,.12);
+  }
+  .leaf-label .lpct{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);white-space:nowrap;pointer-events:none;}
+  .leaf-label.complete .lpct{color:var(--complete);}
+
+  .draw-hint{
+    position:absolute;top:10px;left:50%;transform:translateX(-50%);
+    background:rgba(8,10,13,.8);border:1px solid var(--line);color:var(--text-dim);
+    font-size:11px;letter-spacing:.04em;font-family:'JetBrains Mono',monospace;
+    padding:6px 12px;border-radius:20px;z-index:6;pointer-events:none;text-align:center;max-width:80%;
+  }
+  .pending-bar{
+    display:none;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;
+    background:var(--panel-alt);border:1px solid var(--accent);
+    padding:10px 14px;border-radius:10px;margin-top:12px;
+  }
+  .pending-bar span{font-size:12px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;}
+  .pending-bar .btn{padding:8px 16px;font-size:13px;}
+  .toast{
+    position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
+    background:rgba(255,69,69,.15);border:1px solid var(--rec);color:#ffb3b3;
+    font-size:11px;font-family:'JetBrains Mono',monospace;letter-spacing:.03em;
+    padding:6px 12px;border-radius:20px;z-index:8;opacity:0;transition:opacity .2s ease;pointer-events:none;
+  }
+  .toast.show{opacity:1;}
+
+  /* ---------- Deck (controls) ---------- */
+  .deck{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px 20px;margin-bottom:20px;}
+  .deck-row{display:flex;flex-wrap:wrap;gap:22px;align-items:flex-end;}
+  .field-group{display:flex;flex-direction:column;gap:6px;}
+  .field-group label{font-family:'Barlow Condensed',sans-serif;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);}
+  .file-btn{display:inline-flex;align-items:center;gap:8px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);padding:9px 14px;border-radius:8px;font-size:13px;cursor:pointer;transition:border-color .15s ease;}
+  .file-btn:hover{border-color:var(--accent);}
+  .file-btn input{display:none;}
+  .file-name{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);margin-top:4px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+  select, input[type=number]{background:var(--panel-alt);border:1px solid var(--line);color:var(--text);border-radius:7px;padding:8px 10px;font-family:'JetBrains Mono',monospace;font-size:13px;width:88px;}
+  select{width:auto;min-width:170px;}
+  select:focus, input:focus{outline:2px solid var(--accent);outline-offset:1px;}
+
+  .btn{background:var(--accent);color:#1a1204;border:none;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;letter-spacing:.04em;text-transform:uppercase;padding:10px 18px;border-radius:8px;cursor:pointer;transition:filter .15s ease, transform .05s ease;}
+  .btn:hover{filter:brightness(1.08);}
+  .btn:active{transform:translateY(1px);}
+  .btn.ghost{background:transparent;color:var(--text-dim);border:1px solid var(--line);}
+  .btn.ghost:hover{color:var(--text);border-color:var(--text-dim);}
+  .btn:disabled{opacity:.35;cursor:not-allowed;filter:none;}
+
+  .privacy-note{display:flex;align-items:flex-start;gap:8px;margin-top:16px;padding-top:14px;border-top:1px dashed var(--line);font-size:12px;color:var(--text-dim);line-height:1.6;}
+  .privacy-note svg{flex-shrink:0;margin-top:2px;}
+  .privacy-note b{color:var(--text);}
+
+  /* ---------- Console / channel strips ---------- */
+  .console-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:10px;}
+  .console-head h2{font-family:'Barlow Condensed',sans-serif;font-size:18px;letter-spacing:.05em;text-transform:uppercase;margin:0;color:var(--text);}
+  .channels{display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;scrollbar-color:var(--line) transparent;}
+  .channels::-webkit-scrollbar{height:8px;}
+  .channels::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px;}
+
+  .channel{flex:0 0 148px;background:var(--panel-alt);border:1px solid var(--line);border-radius:10px;padding:12px 10px 14px;display:flex;flex-direction:column;align-items:center;gap:10px;transition:border-color .2s ease;}
+  .channel.complete{border-color:var(--complete);}
+  .ch-index{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:.1em;align-self:flex-start;}
+  .ch-label{width:100%;background:transparent;border:none;border-bottom:1px solid var(--line);color:var(--text);font-family:'Barlow Condensed',sans-serif;font-size:15px;text-align:center;padding:2px 2px 5px;letter-spacing:.02em;}
+  .ch-label:focus{outline:none;border-bottom-color:var(--accent);}
+
+  .fader-row{display:flex;align-items:flex-end;gap:8px;height:130px;}
+  .fader-track{
+    position:relative;width:34px;height:130px;
+    background:var(--panel);border:1px solid var(--line);border-radius:6px;
+    overflow:visible;cursor:pointer;touch-action:none;
+  }
+  .fader-track .fill{position:absolute;left:0;right:0;bottom:0;border-radius:0 0 5px 5px;background:linear-gradient(to top, var(--accent), #ffd27a);pointer-events:none;}
+  .channel.complete .fader-track .fill{background:linear-gradient(to top, var(--complete), #9dfcc4);}
+  .fader-track .thumb{
+    position:absolute;left:-4px;right:-4px;height:14px;
+    background:#fff;border:2px solid var(--accent);border-radius:4px;
+    transform:translateY(50%);pointer-events:none;
+    box-shadow:0 1px 4px rgba(0,0,0,.5);
+  }
+  .channel.complete .fader-track .thumb{border-color:var(--complete);}
+
+  .ch-pct{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:15px;color:var(--accent);}
+  .channel.complete .ch-pct{color:var(--complete);}
+  .ch-numbers{display:flex;flex-direction:column;gap:6px;width:100%;}
+  .ch-numbers .row{display:flex;align-items:center;justify-content:space-between;gap:6px;}
+  .ch-numbers label{font-size:10px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;letter-spacing:.04em;}
+  .ch-numbers input{width:62px;padding:5px 6px;font-size:12px;}
+
+  footer{text-align:center;color:var(--text-dim);font-size:11px;margin-top:26px;font-family:'JetBrains Mono',monospace;letter-spacing:.03em;}
+
+  @media (max-width:640px){
+    .deck-row{gap:14px;}
+    input[type=number]{width:72px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <span class="rec-dot" id="recDot"></span>
+      <div>
+        <h1>PANEL <span>OPEN</span> CONSOLE</h1>
+        <div class="tagline">パネル開けメーカー — 画像分割 &amp; モザイク解除ツール</div>
+      </div>
+    </div>
+    <div class="status-text" id="statusText">STANDBY — 0 / 0 OPEN</div>
+  </header>
+
+  <!-- ============ MONITOR (hero preview) ============ -->
+  <div class="monitor">
+    <div class="monitor-bar">
+      <span>MONITOR OUT</span>
+      <div class="dot-row"><span></span><span></span><span></span></div>
+    </div>
+    <div class="screen">
+      <div class="placeholder" id="placeholder">
+        <b>NO SIGNAL</b>
+        画像を選択すると、ここにパネルが表示されます
+      </div>
+      <div class="stage-wrap" id="stageWrap">
+        <canvas id="mainCanvas"></canvas>
+        <canvas id="drawCanvas"></canvas>
+        <div class="labels-layer" id="labelsLayer"></div>
+        <div class="draw-hint" id="drawHint" style="display:none;">画像の上をドラッグして切る線を引いてください</div>
+        <div class="toast" id="toast"></div>
+      </div>
+    </div>
+    <div class="pending-bar" id="pendingBar">
+      <span>丸いハンドルをドラッグして調整できます</span>
+      <button class="btn" id="confirmCutBtn">この位置で切る</button>
+      <button class="btn ghost" id="cancelCutBtn">キャンセル</button>
+    </div>
+  </div>
+
+  <!-- ============ DECK (image + split settings) ============ -->
+  <div class="deck">
+    <div class="deck-row">
+      <div class="field-group">
+        <label>イラストを選択</label>
+        <label class="file-btn">
+          📁 画像ファイルを選ぶ
+          <input type="file" id="fileInput" accept="image/*">
+        </label>
+        <div class="file-name" id="fileName">未選択</div>
+      </div>
+
+      <div class="field-group">
+        <label>分割方法</label>
+        <select id="modeInput">
+          <option value="grid">パネルモード（縦横等分）</option>
+          <option value="random">ランダム分割（斜めあり）</option>
+          <option value="manual">手動で線を引く</option>
+        </select>
+      </div>
+
+      <div class="field-group" id="countGroup">
+        <label id="countLabel">分割数（1辺）例：3→9分割</label>
+        <input type="number" id="countInput" min="1" max="5" value="3">
+      </div>
+
+      <div class="field-group" id="applyGroup">
+        <button class="btn" id="applyBtn">分割を生成</button>
+      </div>
+
+      <div class="field-group" id="manualGroup" style="display:none;">
+        <label>手動モード（現在<span id="manualCount">1</span>枚）</label>
+        <div style="display:flex;gap:8px;">
+          <button class="btn ghost" id="undoBtn">1つ戻す</button>
+          <button class="btn ghost" id="manualResetBtn">最初からやり直す</button>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <button class="btn ghost" id="resetValuesBtn">現在値を全て0にリセット</button>
+      </div>
+    </div>
+
+    <div class="privacy-note">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8891a1" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+      <div><b>サーバー保存なし。</b> 選択した画像はこのブラウザの中だけで処理されます。どこにもアップロード・送信・保存されません。ページを閉じれば消えます。</div>
+    </div>
+  </div>
+
+  <!-- ============ CONSOLE (channel strips) ============ -->
+  <div class="deck">
+    <div class="console-head">
+      <h2>チャンネル設定</h2>
+      <span class="tagline" style="margin:0;">項目名・上限値・現在値を入力するとモザイクがリアルタイムで動きます</span>
+    </div>
+    <div class="channels" id="channels"></div>
+  </div>
+
+  <footer>PANEL OPEN CONSOLE — すべての処理はローカルのブラウザ内で完結します</footer>
+</div>
+
+<script>
+(() => {
+  const EPS = 1e-6;
+
+  const state = {
+    img: null,
+    W: 0, H: 0,
+    mode: 'grid',
+    leaves: [],
+    manualHistory: []
+  };
+
+  const MAX_RES = 1000;
+
+  // ---------- DOM refs ----------
+  const fileInput = document.getElementById('fileInput');
+  const fileName = document.getElementById('fileName');
+  const modeInput = document.getElementById('modeInput');
+  const countInput = document.getElementById('countInput');
+  const countGroup = document.getElementById('countGroup');
+  const applyGroup = document.getElementById('applyGroup');
+  const applyBtn = document.getElementById('applyBtn');
+  const manualGroup = document.getElementById('manualGroup');
+  const manualCountEl = document.getElementById('manualCount');
+  const undoBtn = document.getElementById('undoBtn');
+  const manualResetBtn = document.getElementById('manualResetBtn');
+  const resetValuesBtn = document.getElementById('resetValuesBtn');
+  const channelsEl = document.getElementById('channels');
+  const placeholderEl = document.getElementById('placeholder');
+  const stageWrap = document.getElementById('stageWrap');
+  const mainCanvas = document.getElementById('mainCanvas');
+  const drawCanvas = document.getElementById('drawCanvas');
+  const labelsLayer = document.getElementById('labelsLayer');
+  const drawHint = document.getElementById('drawHint');
+  const pendingBar = document.getElementById('pendingBar');
+  const confirmCutBtn = document.getElementById('confirmCutBtn');
+  const cancelCutBtn = document.getElementById('cancelCutBtn');
+  const toastEl = document.getElementById('toast');
+  const statusText = document.getElementById('statusText');
+  const recDot = document.getElementById('recDot');
+
+  const mainCtx = mainCanvas.getContext('2d');
+  const drawCtx = drawCanvas.getContext('2d');
+  const smallCanvas = document.createElement('canvas');
+  const smallCtx = smallCanvas.getContext('2d');
+  const frameCanvas = document.createElement('canvas');
+  const frameCtx = frameCanvas.getContext('2d');
+
+  let toastTimer = null;
+
+  // ---------- geometry helpers ----------
+  function clamp(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); }
+
+  function polygonArea(poly){
+    let a = 0;
+    for(let i=0;i<poly.length;i++){
+      const [x1,y1] = poly[i];
+      const [x2,y2] = poly[(i+1)%poly.length];
+      a += x1*y2 - x2*y1;
+    }
+    return Math.abs(a)/2;
+  }
+
+  function centroidOf(poly){
+    let a=0, cx=0, cy=0;
+    for(let i=0;i<poly.length;i++){
+      const [x1,y1] = poly[i];
+      const [x2,y2] = poly[(i+1)%poly.length];
+      const cross = x1*y2 - x2*y1;
+      a += cross; cx += (x1+x2)*cross; cy += (y1+y2)*cross;
+    }
+    a *= 0.5;
+    if(Math.abs(a) < EPS){
+      const n = poly.length;
+      const sx = poly.reduce((s,p)=>s+p[0],0)/n;
+      const sy = poly.reduce((s,p)=>s+p[1],0)/n;
+      return [sx, sy];
+    }
+    return [cx/(6*a), cy/(6*a)];
+  }
+
+  function bboxOf(poly){
+    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+    poly.forEach(([x,y])=>{ if(x<minX)minX=x; if(x>maxX)maxX=x; if(y<minY)minY=y; if(y>maxY)maxY=y; });
+    return { minX, minY, maxX, maxY, w:maxX-minX, h:maxY-minY };
+  }
+
+  function pointInPolygon(pt, poly){
+    let inside = false;
+    const [px,py] = pt;
+    for(let i=0, j=poly.length-1; i<poly.length; j=i++){
+      const [xi,yi] = poly[i], [xj,yj] = poly[j];
+      const intersect = ((yi>py) !== (yj>py)) && (px < (xj-xi) * (py-yi) / (yj-yi) + xi);
+      if(intersect) inside = !inside;
+    }
+    return inside;
+  }
+
+  function clipHalfPlane(poly, a, b, side){
+    const out = [];
+    const sideOf = (p) => ((b[0]-a[0])*(p[1]-a[1]) - (b[1]-a[1])*(p[0]-a[0])) * side;
+    for(let i=0;i<poly.length;i++){
+      const cur = poly[i];
+      const prev = poly[(i-1+poly.length)%poly.length];
+      const curIn = sideOf(cur) >= -EPS;
+      const prevIn = sideOf(prev) >= -EPS;
+      if(curIn){
+        if(!prevIn){ out.push(intersectLine(prev, cur, a, b)); }
+        out.push(cur);
+      } else if(prevIn){
+        out.push(intersectLine(prev, cur, a, b));
+      }
+    }
+    return out;
+  }
+
+  function intersectLine(p1, p2, a, b){
+    const d1x = p2[0]-p1[0], d1y = p2[1]-p1[1];
+    const d2x = b[0]-a[0], d2y = b[1]-a[1];
+    const denom = d1x*d2y - d1y*d2x;
+    if(Math.abs(denom) < EPS) return p1;
+    const t = ((a[0]-p1[0])*d2y - (a[1]-p1[1])*d2x) / denom;
+    return [p1[0]+d1x*t, p1[1]+d1y*t];
+  }
+
+  function splitPolygonByLine(poly, a, b, minAreaRatio){
+    const total = state.W * state.H;
+    const minArea = total * minAreaRatio;
+    const left = clipHalfPlane(poly, a, b, 1);
+    const right = clipHalfPlane(poly, a, b, -1);
+    if(left.length < 3 || right.length < 3) return null;
+    if(polygonArea(left) < minArea || polygonArea(right) < minArea) return null;
+    return [left, right];
+  }
+
+  function defaultConfig(i){ return { label: `パネル${i+1}`, target: 100, current: 0 }; }
+  function fullRectPoly(){ return [[0,0],[state.W,0],[state.W,state.H],[0,state.H]]; }
+
+  // ---------- leaf builders ----------
+  function buildGridLeaves(n){
+    const leaves = [];
+    let index = 0;
+    for(let row=0; row<n; row++){
+      for(let col=0; col<n; col++){
+        const x0 = col*state.W/n, x1 = (col+1)*state.W/n;
+        const y0 = row*state.H/n, y1 = (row+1)*state.H/n;
+        const poly = [[x0,y0],[x1,y0],[x1,y1],[x0,y1]];
+        const old = state.leaves[index];
+        leaves.push({ poly, config: old ? old.config : defaultConfig(index) });
+        index++;
+      }
+    }
+    return leaves;
+  }
+
+  function buildRandomLeaves(n){
+    let leaves = [{ poly: fullRectPoly(), config: (state.leaves[0] && state.leaves[0].config) || defaultConfig(0) }];
+    let guard = 0;
+    while(leaves.length < n && guard < 800){
+      guard++;
+      let idx = 0, maxA = -1;
+      leaves.forEach((l,i)=>{ const a = polygonArea(l.poly); if(a>maxA){ maxA=a; idx=i; } });
+      const target = leaves[idx];
+      const bbox = bboxOf(target.poly);
+      const c = centroidOf(target.poly);
+      const diag = Math.hypot(bbox.w, bbox.h) * 2 + 20;
+      const cx = c[0] + (Math.random()-0.5) * bbox.w * 0.4;
+      const cy = c[1] + (Math.random()-0.5) * bbox.h * 0.4;
+      const theta = Math.random() * Math.PI;
+      const dx = Math.cos(theta), dy = Math.sin(theta);
+      const p1 = [cx - dx*diag, cy - dy*diag];
+      const p2 = [cx + dx*diag, cy + dy*diag];
+      const result = splitPolygonByLine(target.poly, p1, p2, 0.015);
+      if(!result) continue;
+      const nextIndex = leaves.length;
+      leaves.splice(idx, 1,
+        { poly: result[0], config: target.config },
+        { poly: result[1], config: defaultConfig(nextIndex) }
+      );
+    }
+    return leaves;
+  }
+
+  // ---------- pixelated frame ----------
+  function getPixelatedFrame(pixelSize){
+    frameCanvas.width = state.W; frameCanvas.height = state.H;
+    if(pixelSize <= 1){
+      frameCtx.imageSmoothingEnabled = true;
+      frameCtx.clearRect(0,0,state.W,state.H);
+      frameCtx.drawImage(state.img, 0,0,state.W,state.H);
+      return frameCanvas;
+    }
+    const smallW = Math.max(1, Math.round(state.W/pixelSize));
+    const smallH = Math.max(1, Math.round(state.H/pixelSize));
+    smallCanvas.width = smallW; smallCanvas.height = smallH;
+    smallCtx.imageSmoothingEnabled = true;
+    smallCtx.clearRect(0,0,smallW,smallH);
+    smallCtx.drawImage(state.img, 0,0,smallW,smallH);
+    frameCtx.imageSmoothingEnabled = false;
+    frameCtx.clearRect(0,0,state.W,state.H);
+    frameCtx.drawImage(smallCanvas, 0,0,smallW,smallH, 0,0,state.W,state.H);
+    return frameCanvas;
+  }
+
+  function percentOf(cfg){
+    if(!cfg.target || cfg.target <= 0) return 0;
+    return clamp((cfg.current/cfg.target)*100, 0, 100);
+  }
+
+  // ---------- rendering ----------
+  function renderAll(){
+    if(!state.img){
+      placeholderEl.style.display = '';
+      stageWrap.style.display = 'none';
+      updateStatus();
+      return;
+    }
+    placeholderEl.style.display = 'none';
+    stageWrap.style.display = 'block';
+    stageWrap.style.aspectRatio = `${state.W} / ${state.H}`;
+
+    [mainCanvas, drawCanvas].forEach(c => { c.width = state.W; c.height = state.H; });
+
+    mainCtx.clearRect(0,0,state.W,state.H);
+
+    state.leaves.forEach(leaf => {
+      const pct = percentOf(leaf.config);
+      const maxPixel = Math.max(6, Math.floor(Math.min(state.W, state.H) / 22));
+      const pixelSize = Math.max(1, Math.round(maxPixel * (1 - pct/100)));
+      const frame = getPixelatedFrame(pixelSize);
+
+      mainCtx.save();
+      mainCtx.beginPath();
+      leaf.poly.forEach(([x,y], i) => i===0 ? mainCtx.moveTo(x,y) : mainCtx.lineTo(x,y));
+      mainCtx.closePath();
+      mainCtx.clip();
+      mainCtx.drawImage(frame, 0, 0);
+      mainCtx.restore();
+    });
+
+    state.leaves.forEach(leaf => {
+      mainCtx.beginPath();
+      leaf.poly.forEach(([x,y], i) => i===0 ? mainCtx.moveTo(x,y) : mainCtx.lineTo(x,y));
+      mainCtx.closePath();
+      const complete = percentOf(leaf.config) >= 100;
+      mainCtx.strokeStyle = complete ? '#37d67a' : 'rgba(10,12,16,.85)';
+      mainCtx.lineWidth = complete ? 3 : 2;
+      mainCtx.stroke();
+    });
+
+    labelsLayer.innerHTML = '';
+    state.leaves.forEach(leaf => {
+      const cfg = leaf.config;
+      const [cx, cy] = centroidOf(leaf.poly);
+      const pct = percentOf(cfg);
+      const complete = pct >= 100;
+
+      const pill = document.createElement('div');
+      pill.className = 'leaf-label' + (complete ? ' complete' : '');
+      pill.style.left = `${(cx/state.W)*100}%`;
+      pill.style.top = `${(cy/state.H)*100}%`;
+
+      const nameEl = document.createElement('div');
+      nameEl.className = 'lname';
+      nameEl.contentEditable = 'true';
+      nameEl.spellcheck = false;
+      nameEl.textContent = cfg.label;
+
+      const pctEl = document.createElement('div');
+      pctEl.className = 'lpct';
+      pctEl.textContent = `${Math.round(cfg.current)}/${Math.round(cfg.target)} ・ ${Math.round(pct)}%`;
+
+      pill.appendChild(nameEl);
+      pill.appendChild(pctEl);
+      labelsLayer.appendChild(pill);
+
+      // Edit the panel name directly on the image. Same fix as the number fields:
+      // update state on 'input' without re-rendering (which would kill focus/cursor
+      // mid-type), and only sync the console + redraw once the user leaves the field.
+      nameEl.addEventListener('input', () => {
+        const t = nameEl.textContent.replace(/\n/g,'').trim();
+        if(t) cfg.label = t;
+      });
+      nameEl.addEventListener('keydown', (e) => {
+        if(e.key === 'Enter'){ e.preventDefault(); nameEl.blur(); }
+      });
+      nameEl.addEventListener('blur', () => {
+        nameEl.textContent = cfg.label;
+        renderConsole();
+      });
+    });
+
+    drawHint.style.display = (state.mode === 'manual' && !manualPending) ? '' : 'none';
+    manualCountEl.textContent = state.leaves.length;
+
+    updateStatus();
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  function updateStatus(){
+    const n = state.leaves.length;
+    const openCount = state.leaves.filter(l => percentOf(l.config) >= 100).length;
+    const allOpen = n > 0 && openCount === n;
+    statusText.textContent = allOpen ? `ALL PANELS OPEN — ${openCount} / ${n}` : `ON AIR — ${openCount} / ${n} OPEN`;
+    statusText.classList.toggle('complete', allOpen);
+    recDot.classList.toggle('complete', allOpen);
+  }
+
+  function showToast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1800);
+  }
+
+  // ---------- console (channel strips) ----------
+  function renderConsole(){
+    channelsEl.innerHTML = '';
+
+    state.leaves.forEach((leaf, i) => {
+      const cfg = leaf.config;
+      const root = document.createElement('div');
+      root.className = 'channel';
+
+      const idx = document.createElement('div');
+      idx.className = 'ch-index';
+      idx.textContent = `CH ${String(i+1).padStart(2,'0')}`;
+      root.appendChild(idx);
+
+      const labelInput = document.createElement('input');
+      labelInput.className = 'ch-label';
+      labelInput.value = cfg.label;
+      labelInput.maxLength = 20;
+      root.appendChild(labelInput);
+
+      const faderRow = document.createElement('div');
+      faderRow.className = 'fader-row';
+      const track = document.createElement('div');
+      track.className = 'fader-track';
+      const fill = document.createElement('div');
+      fill.className = 'fill';
+      const thumb = document.createElement('div');
+      thumb.className = 'thumb';
+      track.appendChild(fill);
+      track.appendChild(thumb);
+      faderRow.appendChild(track);
+      root.appendChild(faderRow);
+
+      const pctEl = document.createElement('div');
+      pctEl.className = 'ch-pct';
+      root.appendChild(pctEl);
+
+      const numbers = document.createElement('div');
+      numbers.className = 'ch-numbers';
+      const curRow = document.createElement('div');
+      curRow.className = 'row';
+      const curLabel = document.createElement('label');
+      curLabel.textContent = '現在値';
+      const curInput = document.createElement('input');
+      curInput.type = 'number'; curInput.min = 0; curInput.value = cfg.current;
+      curRow.appendChild(curLabel); curRow.appendChild(curInput);
+
+      const tgtRow = document.createElement('div');
+      tgtRow.className = 'row';
+      const tgtLabel = document.createElement('label');
+      tgtLabel.textContent = '上限値';
+      const tgtInput = document.createElement('input');
+      tgtInput.type = 'number'; tgtInput.min = 1; tgtInput.value = cfg.target;
+      tgtRow.appendChild(tgtLabel); tgtRow.appendChild(tgtInput);
+
+      numbers.appendChild(curRow); numbers.appendChild(tgtRow);
+      root.appendChild(numbers);
+
+      channelsEl.appendChild(root);
+
+      function sync(){
+        const pct = percentOf(cfg);
+        // Don't overwrite whichever text field the user is actively typing in —
+        // rewriting a focused input's value mid-keystroke is what causes mobile
+        // keyboards to duplicate or jump digits. Only sync fields that aren't focused.
+        if(document.activeElement !== curInput) curInput.value = cfg.current;
+        if(document.activeElement !== tgtInput) tgtInput.value = cfg.target;
+        pctEl.textContent = `${Math.round(pct)}%`;
+        fill.style.height = `${pct}%`;
+        thumb.style.bottom = `${pct}%`;
+        root.classList.toggle('complete', pct >= 100);
+      }
+
+      labelInput.addEventListener('input', () => {
+        cfg.label = labelInput.value || `パネル${i+1}`;
+        if(state.img) renderAll();
+      });
+
+      // ---- custom vertical fader (touch-safe, no native range quirks) ----
+      let faderDragging = false;
+      function setFromClientY(clientY){
+        const rect = track.getBoundingClientRect();
+        const rel = 1 - clamp((clientY - rect.top) / rect.height, 0, 1);
+        const v = Math.round(rel * cfg.target);
+        cfg.current = clamp(v, 0, cfg.target);
+        sync();
+        if(state.img) renderAll();
+      }
+      track.addEventListener('pointerdown', (e) => {
+        faderDragging = true;
+        track.setPointerCapture(e.pointerId);
+        setFromClientY(e.clientY);
+        e.preventDefault();
+      });
+      track.addEventListener('pointermove', (e) => {
+        if(!faderDragging) return;
+        setFromClientY(e.clientY);
+        e.preventDefault();
+      });
+      track.addEventListener('pointerup', () => { faderDragging = false; });
+      track.addEventListener('pointercancel', () => { faderDragging = false; });
+
+      curInput.addEventListener('input', () => {
+        let v = Number(curInput.value); if(isNaN(v)) v = 0;
+        cfg.current = clamp(v, 0, cfg.target);
+        sync(); if(state.img) renderAll();
+      });
+      curInput.addEventListener('blur', () => {
+        // now that typing is finished, normalize the displayed text to the clamped value
+        curInput.value = cfg.current;
+      });
+
+      tgtInput.addEventListener('input', () => {
+        let v = Number(tgtInput.value); if(isNaN(v) || v < 1) v = 1;
+        cfg.target = v; cfg.current = clamp(cfg.current, 0, cfg.target);
+        sync(); if(state.img) renderAll();
+      });
+      tgtInput.addEventListener('blur', () => {
+        tgtInput.value = cfg.target;
+      });
+
+      sync();
+    });
+  }
+
+  // ---------- mode / build ----------
+  const countLabel = document.getElementById('countLabel');
+
+  function applyModeVisibility(){
+    const manual = state.mode === 'manual';
+    countGroup.style.display = manual ? 'none' : '';
+    applyGroup.style.display = manual ? 'none' : '';
+    manualGroup.style.display = manual ? '' : 'none';
+    drawCanvas.style.pointerEvents = manual ? 'auto' : 'none';
+    if(!manual) clearPending();
+
+    if(state.mode === 'grid'){
+      countInput.min = 1; countInput.max = 5;
+      countInput.value = clamp(Math.round(Number(countInput.value) || 3), 1, 5);
+      countLabel.textContent = `分割数（1辺）例：3→9分割`;
+    } else if(state.mode === 'random'){
+      countInput.min = 3; countInput.max = 10;
+      countInput.value = clamp(Math.round(Number(countInput.value) || 5), 3, 10);
+      countLabel.textContent = `分割数（合計 3〜10）`;
+    }
+  }
+
+  function buildFromMode(){
+    if(state.mode === 'grid'){
+      const n = clamp(Math.round(Number(countInput.value) || 3), 1, 5);
+      countInput.value = n;
+      state.leaves = buildGridLeaves(n);
+    } else if(state.mode === 'random'){
+      const n = clamp(Math.round(Number(countInput.value) || 5), 3, 10);
+      countInput.value = n;
+      state.leaves = buildRandomLeaves(n);
+    }
+    renderConsole();
+    renderAll();
+  }
+
+  modeInput.addEventListener('change', () => {
+    state.mode = modeInput.value;
+    clearPending();
+    applyModeVisibility();
+    if(state.mode === 'manual'){
+      state.manualHistory = [];
+      const keepCfg = state.leaves[0] ? state.leaves[0].config : defaultConfig(0);
+      state.leaves = state.img ? [{ poly: fullRectPoly(), config: keepCfg }] : [{ poly: [[0,0],[1,0],[1,1],[0,1]], config: keepCfg }];
+      renderConsole();
+      renderAll();
+    } else {
+      buildFromMode();
+    }
+  });
+
+  applyBtn.addEventListener('click', buildFromMode);
+
+  resetValuesBtn.addEventListener('click', () => {
+    state.leaves.forEach(l => l.config.current = 0);
+    renderConsole();
+    if(state.img) renderAll();
+  });
+
+  undoBtn.addEventListener('click', () => {
+    clearPending();
+    if(state.manualHistory.length === 0){ showToast('これ以上戻せません'); return; }
+    state.leaves = state.manualHistory.pop();
+    renderConsole();
+    renderAll();
+  });
+
+  manualResetBtn.addEventListener('click', () => {
+    clearPending();
+    state.manualHistory = [];
+    const keepCfg = state.leaves[0] ? state.leaves[0].config : defaultConfig(0);
+    state.leaves = [{ poly: fullRectPoly(), config: keepCfg }];
+    renderConsole();
+    renderAll();
+  });
+
+  // ---------- manual drawing: draft line + draggable start/end handles ----------
+  let manualPending = null;   // { start:[x,y], end:[x,y] }
+  let draggingHandle = null;  // 'start' | 'end' | null
+  let isNewLineDrag = false;
+  let dragStart = null;
+
+  function toDesignCoords(e){
+    const rect = drawCanvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width * state.W;
+    const y = (e.clientY - rect.top) / rect.height * state.H;
+    return [x, y];
+  }
+
+  function handleRadiusDesign(){
+    const rect = drawCanvas.getBoundingClientRect();
+    if(rect.width === 0) return 20;
+    return 26 * (state.W / rect.width); // ~26 CSS px touch target
+  }
+
+  function redrawDraftLine(a, b){
+    drawCtx.clearRect(0,0,state.W,state.H);
+    drawCtx.strokeStyle = '#f5a623';
+    drawCtx.lineWidth = Math.max(1.5, state.W/300);
+    drawCtx.setLineDash([state.W/60, state.W/90]);
+    drawCtx.beginPath();
+    drawCtx.moveTo(a[0], a[1]);
+    drawCtx.lineTo(b[0], b[1]);
+    drawCtx.stroke();
+  }
+
+  function redrawPending(){
+    if(!manualPending) return;
+    drawCtx.clearRect(0,0,state.W,state.H);
+    drawCtx.setLineDash([]);
+    drawCtx.strokeStyle = '#f5a623';
+    drawCtx.lineWidth = Math.max(2, state.W/250);
+    drawCtx.beginPath();
+    drawCtx.moveTo(manualPending.start[0], manualPending.start[1]);
+    drawCtx.lineTo(manualPending.end[0], manualPending.end[1]);
+    drawCtx.stroke();
+
+    const r = Math.max(10, state.W*0.018);
+    [manualPending.start, manualPending.end].forEach(pt => {
+      drawCtx.beginPath();
+      drawCtx.arc(pt[0], pt[1], r, 0, Math.PI*2);
+      drawCtx.fillStyle = '#f5a623';
+      drawCtx.fill();
+      drawCtx.lineWidth = Math.max(2, state.W/300);
+      drawCtx.strokeStyle = '#0a0c0d';
+      drawCtx.stroke();
+    });
+  }
+
+  function clearPending(){
+    manualPending = null;
+    draggingHandle = null;
+    isNewLineDrag = false;
+    dragStart = null;
+    drawCtx.clearRect(0,0,state.W,state.H);
+    pendingBar.style.display = 'none';
+    drawHint.style.display = (state.mode === 'manual') ? '' : 'none';
+  }
+
+  drawCanvas.addEventListener('pointerdown', (e) => {
+    if(state.mode !== 'manual' || !state.img) return;
+    const pt = toDesignCoords(e);
+
+    if(manualPending){
+      const thresh = handleRadiusDesign();
+      const dStart = Math.hypot(pt[0]-manualPending.start[0], pt[1]-manualPending.start[1]);
+      const dEnd = Math.hypot(pt[0]-manualPending.end[0], pt[1]-manualPending.end[1]);
+      if(dStart <= thresh && dStart <= dEnd){ draggingHandle = 'start'; }
+      else if(dEnd <= thresh){ draggingHandle = 'end'; }
+      else { draggingHandle = null; return; }
+      drawCanvas.setPointerCapture(e.pointerId);
+      e.preventDefault();
+      return;
+    }
+
+    isNewLineDrag = true;
+    dragStart = pt;
+    drawCanvas.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+
+  drawCanvas.addEventListener('pointermove', (e) => {
+    if(state.mode !== 'manual' || !state.img) return;
+    if(draggingHandle){
+      const pt = toDesignCoords(e);
+      manualPending[draggingHandle] = pt;
+      redrawPending();
+      e.preventDefault();
+      return;
+    }
+    if(isNewLineDrag){
+      const pt = toDesignCoords(e);
+      redrawDraftLine(dragStart, pt);
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  function finishPointer(e){
+    if(state.mode !== 'manual') return;
+    if(draggingHandle){ draggingHandle = null; return; }
+    if(isNewLineDrag){
+      isNewLineDrag = false;
+      const pt = toDesignCoords(e);
+      if(Math.hypot(pt[0]-dragStart[0], pt[1]-dragStart[1]) < Math.max(6, state.W*0.015)){
+        drawCtx.clearRect(0,0,state.W,state.H);
+        dragStart = null;
+        return;
+      }
+      manualPending = { start: dragStart, end: pt };
+      dragStart = null;
+      redrawPending();
+      pendingBar.style.display = 'flex';
+      drawHint.style.display = 'none';
+    }
+  }
+
+  drawCanvas.addEventListener('pointerup', finishPointer);
+  drawCanvas.addEventListener('pointercancel', () => {
+    draggingHandle = null;
+    if(isNewLineDrag){ isNewLineDrag = false; drawCtx.clearRect(0,0,state.W,state.H); dragStart = null; }
+  });
+
+  // Hardened fallback: some mobile browsers still trigger page scroll/pull-to-refresh
+  // during a drag even with touch-action:none set, unless the underlying touch events
+  // are also explicitly prevented (must be non-passive listeners).
+  drawCanvas.addEventListener('touchstart', (e) => {
+    if(state.mode === 'manual') e.preventDefault();
+  }, { passive: false });
+  drawCanvas.addEventListener('touchmove', (e) => {
+    if(state.mode === 'manual') e.preventDefault();
+  }, { passive: false });
+  stageWrap.addEventListener('touchmove', (e) => {
+    if(state.mode === 'manual') e.preventDefault();
+  }, { passive: false });
+
+  confirmCutBtn.addEventListener('click', () => {
+    if(!manualPending) return;
+    const start = manualPending.start, end = manualPending.end;
+    const mid = [(start[0]+end[0])/2, (start[1]+end[1])/2];
+    const leafIdx = state.leaves.findIndex(l => pointInPolygon(mid, l.poly));
+    if(leafIdx === -1){ showToast('線の中央がパネルの外側です'); return; }
+
+    const dx = end[0]-start[0], dy = end[1]-start[1];
+    const len = Math.hypot(dx,dy) || 1;
+    const ux = dx/len, uy = dy/len;
+    const diag = (state.W + state.H) * 2;
+    const p1 = [mid[0]-ux*diag, mid[1]-uy*diag];
+    const p2 = [mid[0]+ux*diag, mid[1]+uy*diag];
+
+    const target = state.leaves[leafIdx];
+    const result = splitPolygonByLine(target.poly, p1, p2, 0.01);
+    if(!result){ showToast('この位置では分割できません。ハンドルを動かして調整してください'); return; }
+
+    state.manualHistory.push(state.leaves.map(l => ({ poly: l.poly, config: l.config })));
+    const nextIndex = state.leaves.length;
+    const newLeaves = state.leaves.slice();
+    newLeaves.splice(leafIdx, 1,
+      { poly: result[0], config: target.config },
+      { poly: result[1], config: defaultConfig(nextIndex) }
+    );
+    state.leaves = newLeaves;
+    clearPending();
+    renderConsole();
+    renderAll();
+  });
+
+  cancelCutBtn.addEventListener('click', () => { clearPending(); });
+
+  // ---------- file loading ----------
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    fileName.textContent = file.name;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        state.img = img;
+        const scale = Math.min(1, MAX_RES / Math.max(img.naturalWidth, img.naturalHeight));
+        state.W = Math.round(img.naturalWidth * scale);
+        state.H = Math.round(img.naturalHeight * scale);
+
+        clearPending();
+        if(state.mode === 'manual'){
+          const keepCfg = state.leaves[0] ? state.leaves[0].config : defaultConfig(0);
+          state.leaves = [{ poly: fullRectPoly(), config: keepCfg }];
+          state.manualHistory = [];
+          renderConsole();
+          renderAll();
+        } else {
+          buildFromMode();
+        }
+      };
+      img.src = ev.target.result; // stays local — no network request
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // ---------- init ----------
+  applyModeVisibility();
+  state.leaves = buildGridLeaves(3);
+  renderConsole();
+  renderAll();
+})();
+</script>
+</body>
+</html>
