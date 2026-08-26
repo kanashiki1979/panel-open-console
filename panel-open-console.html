@@ -51,6 +51,9 @@
   .monitor-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:2px 4px 12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);letter-spacing:.06em;}
   .monitor-actions{display:flex;align-items:center;gap:8px;}
   .monitor-actions select{width:auto;min-width:0;padding:6px 8px;font-size:11px;}
+  .btn-sm.active{border-color:var(--accent);color:var(--accent);background:var(--accent-soft);}
+
+  .monitor.pinned{position:sticky;top:0;z-index:20;}
   .btn-sm{padding:6px 12px;font-size:11px;border-radius:6px;letter-spacing:.02em;}
   .screen{
     position:relative;border-radius:8px;overflow:hidden;
@@ -188,8 +191,7 @@
     .deck-row{gap:14px;}
     input[type=number]{width:72px;}
 
-    .monitor{
-      position:sticky;top:0;z-index:20;
+    .monitor.pinned{
       margin-left:-20px;margin-right:-20px;
       border-radius:0 0 14px 14px;
       border-top:none;
@@ -226,6 +228,7 @@
           <option value="medium">表示サイズ：中</option>
           <option value="large">表示サイズ：大</option>
         </select>
+        <button class="btn ghost btn-sm" id="pinToggleBtn">📌 固定中</button>
         <button class="btn ghost btn-sm" id="downloadBtn">📥 画像を保存</button>
       </div>
     </div>
@@ -351,6 +354,8 @@
   const recDot = document.getElementById('recDot');
   const previewSizeInput = document.getElementById('previewSizeInput');
   const downloadBtn = document.getElementById('downloadBtn');
+  const pinToggleBtn = document.getElementById('pinToggleBtn');
+  const monitorEl = document.querySelector('.monitor');
 
   const mainCtx = mainCanvas.getContext('2d');
   const drawCtx = drawCanvas.getContext('2d');
@@ -1041,6 +1046,19 @@
     stageWrap.classList.remove('size-small', 'size-medium', 'size-large');
     stageWrap.classList.add('size-' + previewSizeInput.value);
   });
+
+  // ---------- pin / unpin the monitor (mainly for mobile scrolling) ----------
+  let monitorPinned = true; // matches the previous always-on-mobile behavior; user can release it
+  function updatePinUI(){
+    monitorEl.classList.toggle('pinned', monitorPinned);
+    pinToggleBtn.textContent = monitorPinned ? '📌 固定中（タップで解除）' : '📌 固定する';
+    pinToggleBtn.classList.toggle('active', monitorPinned);
+  }
+  pinToggleBtn.addEventListener('click', () => {
+    monitorPinned = !monitorPinned;
+    updatePinUI();
+  });
+  updatePinUI();
 
   // ---------- download as PNG (bakes in labels/percentages) ----------
   async function buildExportCanvas(){
