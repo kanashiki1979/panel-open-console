@@ -319,6 +319,13 @@
       <div class="field-group">
         <button class="btn ghost" id="resetValuesBtn">現在値を全て0にリセット</button>
       </div>
+
+      <div class="field-group">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-dim);padding:9px 0;">
+          <input type="checkbox" id="monoStartToggle" style="width:auto;">
+          モザイク初期カラーをモノクロ
+        </label>
+      </div>
     </div>
   </div>
 
@@ -379,7 +386,8 @@
     W: 0, H: 0,
     mode: 'random',
     leaves: [],
-    manualHistory: []
+    manualHistory: [],
+    monoStart: false
   };
 
   const MAX_RES = 1000;
@@ -397,6 +405,7 @@
   const undoBtn = document.getElementById('undoBtn');
   const manualResetBtn = document.getElementById('manualResetBtn');
   const resetValuesBtn = document.getElementById('resetValuesBtn');
+  const monoStartToggle = document.getElementById('monoStartToggle');
   const channelsEl = document.getElementById('channels');
   const edgeFadeLeft = document.getElementById('edgeFadeLeft');
   const edgeFadeRight = document.getElementById('edgeFadeRight');
@@ -612,7 +621,9 @@
       leaf.poly.forEach(([x,y], i) => i===0 ? mainCtx.moveTo(x,y) : mainCtx.lineTo(x,y));
       mainCtx.closePath();
       mainCtx.clip();
+      mainCtx.filter = state.monoStart ? `grayscale(${clamp(100 - pct, 0, 100)}%)` : 'none';
       mainCtx.drawImage(frame, 0, 0);
+      mainCtx.filter = 'none';
       mainCtx.restore();
     });
 
@@ -625,6 +636,8 @@
       mainCtx.lineWidth = complete ? 3 : 2;
       mainCtx.stroke();
     });
+
+    drawSiteWatermark(mainCtx);
 
     labelsLayer.innerHTML = '';
     state.leaves.forEach(leaf => {
@@ -753,7 +766,17 @@
   function renderConsole(){
     channelsEl.innerHTML = '';
 
-    state.leaves.forEach((leaf, i) => {
+    // The underlying leaves array is in creation order (split order), which can
+    // land anywhere visually. Sort a display copy left-to-right (top-to-bottom
+    // as a tiebreaker) so CH numbering reads in the same order the panels
+    // actually appear across the image — this doesn't touch state.leaves itself,
+    // so split/undo/mode logic that relies on array position is unaffected.
+    const orderedLeaves = state.leaves
+      .map(leaf => { const [cx, cy] = centroidOf(leaf.poly); return { leaf, cx, cy }; })
+      .sort((a, b) => (a.cx - b.cx) || (a.cy - b.cy))
+      .map(o => o.leaf);
+
+    orderedLeaves.forEach((leaf, i) => {
       const cfg = leaf.config;
       const root = document.createElement('div');
       root.className = 'channel';
@@ -953,6 +976,12 @@
   resetValuesBtn.addEventListener('click', () => {
     state.leaves.forEach(l => l.config.current = 0);
     renderConsole();
+    if(state.img) renderAll();
+    scheduleAutoSave();
+  });
+
+  monoStartToggle.addEventListener('change', () => {
+    state.monoStart = monoStartToggle.checked;
     if(state.img) renderAll();
     scheduleAutoSave();
   });
@@ -1261,6 +1290,67 @@
     return exp;
   }
 
+  // Bottom-right site credit. Matches the header's logo treatment
+  // (PANEL / OPEN in accent / CONSOLE) plus the URL. Drawn straight onto
+  // mainCanvas from renderAll(), so it shows in the live preview and is
+  // already part of the image mainCanvas is copied from for export.
+  function drawSiteWatermark(ctx){
+    const url = 'https://muginoya.netlify.app/panel-open-console';
+    const marginX = Math.max(10, Math.round(state.W * 0.02));
+    const marginY = Math.max(10, Math.round(state.H * 0.02));
+    const titleSize = Math.max(13, Math.round(state.W * 0.022));
+    const urlSize = Math.max(10, Math.round(state.W * 0.013));
+    const padX = Math.round(titleSize * 0.6);
+    const padY = Math.round(titleSize * 0.5);
+    const gap = Math.round(titleSize * 0.32);
+
+    const segments = [
+      { text: 'PANEL ', color: '#f4f6f9' },
+      { text: 'OPEN', color: '#f5a623' },
+      { text: ' CONSOLE', color: '#f4f6f9' }
+    ];
+
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+
+    ctx.font = `800 ${titleSize}px 'Barlow Condensed', sans-serif`;
+    const titleWidth = segments.reduce((w, s) => w + ctx.measureText(s.text).width, 0);
+    ctx.font = `500 ${urlSize}px 'JetBrains Mono', monospace`;
+    const urlWidth = ctx.measureText(url).width;
+
+    const boxW = Math.max(titleWidth, urlWidth) + padX * 2;
+    const boxH = titleSize + urlSize + gap + padY * 2;
+    const boxX = state.W - marginX - boxW;
+    const boxY = state.H - marginY - boxH;
+    const r = 6;
+
+    ctx.beginPath();
+    ctx.moveTo(boxX + r, boxY);
+    ctx.arcTo(boxX + boxW, boxY, boxX + boxW, boxY + boxH, r);
+    ctx.arcTo(boxX + boxW, boxY + boxH, boxX, boxY + boxH, r);
+    ctx.arcTo(boxX, boxY + boxH, boxX, boxY, r);
+    ctx.arcTo(boxX, boxY, boxX + boxW, boxY, r);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(8,10,13,0.9)';
+    ctx.fill();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+    ctx.stroke();
+
+    let tx = boxX + padX;
+    const ty = boxY + padY;
+    ctx.font = `800 ${titleSize}px 'Barlow Condensed', sans-serif`;
+    segments.forEach(seg => {
+      ctx.fillStyle = seg.color;
+      ctx.fillText(seg.text, tx, ty);
+      tx += ctx.measureText(seg.text).width;
+    });
+
+    ctx.font = `500 ${urlSize}px 'JetBrains Mono', monospace`;
+    ctx.fillStyle = 'rgba(232,235,240,0.92)';
+    ctx.fillText(url, boxX + padX, ty + titleSize + gap);
+  }
+
   function downloadCanvasAsPng(targetCanvas, filename){
     targetCanvas.toBlob(function (blob) {
       if (!blob) return;
@@ -1318,6 +1408,7 @@
       mode: state.mode,
       W: state.W, H: state.H,
       fileName: fileName.textContent,
+      monoStart: state.monoStart,
       image: state.img ? imageToDataUrl(mime) : null,
       leaves: state.leaves.map(l => ({ poly: l.poly, config: l.config }))
     };
@@ -1371,6 +1462,8 @@
     const finish = () => {
       state.mode = snapshot.mode || 'random';
       modeInput.value = state.mode;
+      state.monoStart = !!snapshot.monoStart;
+      monoStartToggle.checked = state.monoStart;
       state.leaves = (snapshot.leaves || []).map(l => ({ poly: l.poly, config: l.config }));
       state.manualHistory = [];
       if(snapshot.fileName) fileName.textContent = snapshot.fileName;
@@ -1462,6 +1555,9 @@
       restoreBarText.textContent = `保存された続きがあります（${formatSavedAt(storedSnapshot.savedAt)}）`;
       restoreBar.style.display = 'flex';
     }
+  }
+  if(document.fonts && document.fonts.ready){
+    document.fonts.ready.then(() => { if(state.img) renderAll(); }).catch(() => {});
   }
 })();
 </script>
