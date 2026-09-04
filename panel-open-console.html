@@ -156,9 +156,20 @@
   .console-head{margin-bottom:12px;}
   .console-head h2{font-family:'Barlow Condensed',sans-serif;font-size:18px;letter-spacing:.05em;text-transform:uppercase;margin:0;color:var(--text);}
   .console-head .tagline{margin-top:4px;}
+  .channels-wrap{position:relative;}
   .channels{display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;scrollbar-color:var(--line) transparent;}
   .channels::-webkit-scrollbar{height:8px;}
   .channels::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px;}
+  .edge-fade{
+    position:absolute;top:0;bottom:8px;width:34px;pointer-events:none;
+    display:flex;align-items:center;z-index:3;opacity:0;transition:opacity .18s ease;
+  }
+  .edge-fade.show{opacity:1;}
+  .edge-fade-left{left:0;justify-content:flex-start;background:linear-gradient(to right, var(--panel) 15%, rgba(27,31,39,0) 100%);}
+  .edge-fade-right{right:0;justify-content:flex-end;background:linear-gradient(to left, var(--panel) 15%, rgba(27,31,39,0) 100%);}
+  .edge-arrow{width:0;height:0;border-top:7px solid transparent;border-bottom:7px solid transparent;opacity:.55;}
+  .edge-fade-left .edge-arrow{border-right:9px solid var(--text-dim);margin-left:3px;}
+  .edge-fade-right .edge-arrow{border-left:9px solid var(--text-dim);margin-right:3px;}
 
   .channel{flex:0 0 115px;background:var(--panel-alt);border:1px solid var(--line);border-radius:10px;padding:12px 10px 14px;display:flex;flex-direction:column;align-items:center;gap:10px;transition:border-color .2s ease;}
   .channel.complete{border-color:var(--complete);}
@@ -314,7 +325,7 @@
   <!-- ============ SAVE / LOAD PROGRESS ============ -->
   <div class="deck">
     <div class="console-head">
-      <h2>進行状況の保存（デフォルト：自動保存、日をまたいで続きから再開できます）</h2>
+      <h2>進行状況の保存（デフォルト：自動保存、日をまたいでも続きから再開できます）</h2>
       <span class="tagline">この端末のブラウザ内にのみ保存されます（どこにも送信されません）。</span>
     </div>
     <div class="deck-row">
@@ -326,19 +337,14 @@
         </label>
       </div>
       <div class="field-group">
-        <label>手動保存 / 引き継ぎ</label>
+        <label>ファイルへの書き出し / 読み込み</label>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn ghost" id="saveProgressBtn">💾 今すぐ保存</button>
           <button class="btn ghost" id="exportProgressBtn">⬇️ ファイルに書き出す</button>
           <label class="file-btn" style="margin:0;">
             ⬆️ ファイルから読み込む
             <input type="file" id="importProgressInput" accept="application/json,.json">
           </label>
         </div>
-      </div>
-      <div class="field-group">
-        <label>保存データの削除</label>
-        <button class="btn ghost" id="clearProgressBtn">🗑 削除する</button>
       </div>
     </div>
     <div class="file-name" id="saveStatusText" style="margin-top:12px;">保存データなし</div>
@@ -350,7 +356,11 @@
       <h2>チャンネル設定</h2>
       <span class="tagline">項目名・上限値・現在値を入力するとモザイクがリアルタイムで動きます。画像上のラベル右上の✥ハンドルをドラッグすると、見せたい部分を避けて位置を動かせます（ダブルタップで元に戻せます）</span>
     </div>
-    <div class="channels" id="channels"></div>
+    <div class="channels-wrap">
+      <div class="channels" id="channels"></div>
+      <div class="edge-fade edge-fade-left" id="edgeFadeLeft"><div class="edge-arrow"></div></div>
+      <div class="edge-fade edge-fade-right" id="edgeFadeRight"><div class="edge-arrow"></div></div>
+    </div>
   </div>
 
   <footer>
@@ -388,6 +398,8 @@
   const manualResetBtn = document.getElementById('manualResetBtn');
   const resetValuesBtn = document.getElementById('resetValuesBtn');
   const channelsEl = document.getElementById('channels');
+  const edgeFadeLeft = document.getElementById('edgeFadeLeft');
+  const edgeFadeRight = document.getElementById('edgeFadeRight');
   const placeholderEl = document.getElementById('placeholder');
   const stageWrap = document.getElementById('stageWrap');
   const mainCanvas = document.getElementById('mainCanvas');
@@ -867,7 +879,21 @@
 
       sync();
     });
+
+    updateChannelScrollHints();
   }
+
+  // Shows a faint triangle at whichever edge still has channels scrolled out of view.
+  function updateChannelScrollHints(){
+    if(!channelsEl) return;
+    const maxScroll = channelsEl.scrollWidth - channelsEl.clientWidth;
+    const canLeft = channelsEl.scrollLeft > 4;
+    const canRight = channelsEl.scrollLeft < maxScroll - 4;
+    edgeFadeLeft.classList.toggle('show', canLeft);
+    edgeFadeRight.classList.toggle('show', canRight);
+  }
+  channelsEl.addEventListener('scroll', updateChannelScrollHints);
+  window.addEventListener('resize', updateChannelScrollHints);
 
   // ---------- mode / build ----------
   const countLabel = document.getElementById('countLabel');
@@ -1259,10 +1285,8 @@
   // ---------- save / load progress (this device's browser storage only) ----------
   const STORAGE_KEY = 'panelOpenConsole:progress:v1';
   const autoSaveToggle = document.getElementById('autoSaveToggle');
-  const saveProgressBtn = document.getElementById('saveProgressBtn');
   const exportProgressBtn = document.getElementById('exportProgressBtn');
   const importProgressInput = document.getElementById('importProgressInput');
-  const clearProgressBtn = document.getElementById('clearProgressBtn');
   const saveStatusText = document.getElementById('saveStatusText');
   const restoreBar = document.getElementById('restoreBar');
   const restoreBarText = document.getElementById('restoreBarText');
@@ -1379,8 +1403,6 @@
     } catch(err){ return null; }
   }
 
-  saveProgressBtn.addEventListener('click', () => saveProgress(true));
-
   exportProgressBtn.addEventListener('click', () => {
     if(!state.img){ showToast('先に画像を選択してください'); return; }
     const snapshot = buildSnapshot('image/png');
@@ -1413,13 +1435,6 @@
     };
     reader.readAsText(file);
     importProgressInput.value = '';
-  });
-
-  clearProgressBtn.addEventListener('click', () => {
-    localStorage.removeItem(STORAGE_KEY);
-    updateSaveStatusUI(null);
-    restoreBar.style.display = 'none';
-    showToast('保存データを削除しました');
   });
 
   restoreBtn.addEventListener('click', () => {
