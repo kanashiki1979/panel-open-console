@@ -96,6 +96,14 @@
   }
   .leaf-label .lpct{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);white-space:nowrap;pointer-events:none;}
   .leaf-label.complete .lpct{color:var(--complete);}
+  .leaf-drag{
+    position:absolute;top:-9px;right:-9px;width:20px;height:20px;border-radius:50%;
+    background:var(--accent);color:#1a1204;display:flex;align-items:center;justify-content:center;
+    font-size:11px;line-height:1;cursor:grab;touch-action:none;pointer-events:auto;
+    box-shadow:0 1px 4px rgba(0,0,0,.5);border:2px solid #0a0c0d;
+  }
+  .leaf-drag:active{cursor:grabbing;}
+  .leaf-label.complete .leaf-drag{background:var(--complete);}
 
   .draw-hint{
     position:absolute;top:10px;left:50%;transform:translateX(-50%);
@@ -218,6 +226,13 @@
     <div class="status-text" id="statusText">STANDBY — 0 / 0 OPEN</div>
   </header>
 
+  <!-- ============ RESTORE BAR (resume saved progress) ============ -->
+  <div class="pending-bar" id="restoreBar">
+    <span id="restoreBarText">保存された続きがあります</span>
+    <button class="btn" id="restoreBtn">続きから開く</button>
+    <button class="btn ghost" id="discardRestoreBtn">使わない（削除）</button>
+  </div>
+
   <!-- ============ MONITOR (hero preview) ============ -->
   <div class="monitor">
     <div class="monitor-bar">
@@ -296,11 +311,44 @@
     </div>
   </div>
 
+  <!-- ============ SAVE / LOAD PROGRESS ============ -->
+  <div class="deck">
+    <div class="console-head">
+      <h2>進行状況の保存</h2>
+      <span class="tagline">この端末のブラウザ内にのみ保存されます（どこにも送信されません）。日をまたいで続きから再開できます。</span>
+    </div>
+    <div class="deck-row">
+      <div class="field-group">
+        <label>自動保存</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-dim);padding:9px 0;">
+          <input type="checkbox" id="autoSaveToggle" checked style="width:auto;">
+          変更するたびに自動で保存する
+        </label>
+      </div>
+      <div class="field-group">
+        <label>手動保存 / 引き継ぎ</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn ghost" id="saveProgressBtn">💾 今すぐ保存</button>
+          <button class="btn ghost" id="exportProgressBtn">⬇️ ファイルに書き出す</button>
+          <label class="file-btn" style="margin:0;">
+            ⬆️ ファイルから読み込む
+            <input type="file" id="importProgressInput" accept="application/json,.json">
+          </label>
+        </div>
+      </div>
+      <div class="field-group">
+        <label>保存データの削除</label>
+        <button class="btn ghost" id="clearProgressBtn">🗑 削除する</button>
+      </div>
+    </div>
+    <div class="file-name" id="saveStatusText" style="margin-top:12px;">保存データなし</div>
+  </div>
+
   <!-- ============ CONSOLE (channel strips) ============ -->
   <div class="deck">
     <div class="console-head">
       <h2>チャンネル設定</h2>
-      <span class="tagline">項目名・上限値・現在値を入力するとモザイクがリアルタイムで動きます</span>
+      <span class="tagline">項目名・上限値・現在値を入力するとモザイクがリアルタイムで動きます。画像上のラベル右上の✥ハンドルをドラッグすると、見せたい部分を避けて位置を動かせます（ダブルタップで元に戻せます）</span>
     </div>
     <div class="channels" id="channels"></div>
   </div>
@@ -451,7 +499,7 @@
     return [left, right];
   }
 
-  function defaultConfig(i){ return { label: `パネル${i+1}`, target: 100, current: 0 }; }
+  function defaultConfig(i){ return { label: `パネル${i+1}`, target: 100, current: 0, labelOffset: [0, 0] }; }
   function fullRectPoly(){ return [[0,0],[state.W,0],[state.W,state.H],[0,state.H]]; }
 
   // ---------- leaf builders ----------
@@ -569,14 +617,20 @@
     labelsLayer.innerHTML = '';
     state.leaves.forEach(leaf => {
       const cfg = leaf.config;
-      const [cx, cy] = centroidOf(leaf.poly);
+      if(!cfg.labelOffset) cfg.labelOffset = [0, 0]; // older saved data may not have this yet
+      const [baseCx, baseCy] = centroidOf(leaf.poly);
       const pct = percentOf(cfg);
       const complete = pct >= 100;
 
       const pill = document.createElement('div');
       pill.className = 'leaf-label' + (complete ? ' complete' : '');
-      pill.style.left = `${(cx/state.W)*100}%`;
-      pill.style.top = `${(cy/state.H)*100}%`;
+      const setPillPos = () => {
+        const lx = clamp(baseCx + cfg.labelOffset[0], 0, state.W);
+        const ly = clamp(baseCy + cfg.labelOffset[1], 0, state.H);
+        pill.style.left = `${(lx/state.W)*100}%`;
+        pill.style.top = `${(ly/state.H)*100}%`;
+      };
+      setPillPos();
 
       const nameEl = document.createElement('div');
       nameEl.className = 'lname';
@@ -588,8 +642,14 @@
       pctEl.className = 'lpct';
       pctEl.textContent = `${Math.round(cfg.current)}/${Math.round(cfg.target)} ・ ${Math.round(pct)}%`;
 
+      const dragHandle = document.createElement('div');
+      dragHandle.className = 'leaf-drag';
+      dragHandle.textContent = '✥';
+      dragHandle.title = 'ドラッグしてラベルの位置を移動（ダブルタップで元の位置に戻す）';
+
       pill.appendChild(nameEl);
       pill.appendChild(pctEl);
+      pill.appendChild(dragHandle);
       labelsLayer.appendChild(pill);
 
       // Edit the panel name directly on the image. Same fix as the number fields:
@@ -605,6 +665,49 @@
       nameEl.addEventListener('blur', () => {
         nameEl.textContent = cfg.label;
         renderConsole();
+        scheduleAutoSave();
+      });
+
+      // Drag the handle to move just this label, independent of the panel shape —
+      // handy for pulling it off whatever part of the art it happens to sit on.
+      let dragging = false;
+      let dragStartClient = null;
+      let dragStartOffset = null;
+      dragHandle.addEventListener('pointerdown', (e) => {
+        dragging = true;
+        dragHandle.setPointerCapture(e.pointerId);
+        dragStartClient = [e.clientX, e.clientY];
+        dragStartOffset = cfg.labelOffset.slice();
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      dragHandle.addEventListener('pointermove', (e) => {
+        if(!dragging) return;
+        const rect = mainCanvas.getBoundingClientRect();
+        if(rect.width === 0 || rect.height === 0) return;
+        const scaleX = state.W / rect.width;
+        const scaleY = state.H / rect.height;
+        const dx = (e.clientX - dragStartClient[0]) * scaleX;
+        const dy = (e.clientY - dragStartClient[1]) * scaleY;
+        cfg.labelOffset = [dragStartOffset[0] + dx, dragStartOffset[1] + dy];
+        setPillPos();
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      const endDrag = (e) => {
+        if(!dragging) return;
+        dragging = false;
+        scheduleAutoSave();
+        if(e){ e.preventDefault(); e.stopPropagation(); }
+      };
+      dragHandle.addEventListener('pointerup', endDrag);
+      dragHandle.addEventListener('pointercancel', endDrag);
+      dragHandle.addEventListener('dblclick', (e) => {
+        cfg.labelOffset = [0, 0];
+        setPillPos();
+        scheduleAutoSave();
+        e.preventDefault();
+        e.stopPropagation();
       });
     });
 
@@ -713,6 +816,7 @@
       labelInput.addEventListener('input', () => {
         cfg.label = labelInput.value || `パネル${i+1}`;
         if(state.img) renderAll();
+        scheduleAutoSave();
       });
 
       // ---- custom vertical fader (touch-safe, no native range quirks) ----
@@ -724,6 +828,7 @@
         cfg.current = clamp(v, 0, cfg.target);
         sync();
         if(state.img) renderAll();
+        scheduleAutoSave();
       }
       track.addEventListener('pointerdown', (e) => {
         faderDragging = true;
@@ -743,6 +848,7 @@
         let v = Number(curInput.value); if(isNaN(v)) v = 0;
         cfg.current = clamp(v, 0, cfg.target);
         sync(); if(state.img) renderAll();
+        scheduleAutoSave();
       });
       curInput.addEventListener('blur', () => {
         // now that typing is finished, normalize the displayed text to the clamped value
@@ -753,6 +859,7 @@
         let v = Number(tgtInput.value); if(isNaN(v) || v < 1) v = 1;
         cfg.target = v; cfg.current = clamp(cfg.current, 0, cfg.target);
         sync(); if(state.img) renderAll();
+        scheduleAutoSave();
       });
       tgtInput.addEventListener('blur', () => {
         tgtInput.value = cfg.target;
@@ -796,6 +903,7 @@
     }
     renderConsole();
     renderAll();
+    scheduleAutoSave();
   }
 
   modeInput.addEventListener('change', () => {
@@ -811,6 +919,7 @@
     } else {
       buildFromMode();
     }
+    scheduleAutoSave();
   });
 
   applyBtn.addEventListener('click', buildFromMode);
@@ -819,6 +928,7 @@
     state.leaves.forEach(l => l.config.current = 0);
     renderConsole();
     if(state.img) renderAll();
+    scheduleAutoSave();
   });
 
   undoBtn.addEventListener('click', () => {
@@ -827,6 +937,7 @@
     state.leaves = state.manualHistory.pop();
     renderConsole();
     renderAll();
+    scheduleAutoSave();
   });
 
   manualResetBtn.addEventListener('click', () => {
@@ -836,6 +947,7 @@
     state.leaves = [{ poly: fullRectPoly(), config: keepCfg }];
     renderConsole();
     renderAll();
+    scheduleAutoSave();
   });
 
   // ---------- manual drawing: draft line + draggable start/end handles ----------
@@ -1006,6 +1118,7 @@
     clearPending();
     renderConsole();
     renderAll();
+    scheduleAutoSave();
   });
 
   cancelCutBtn.addEventListener('click', () => { clearPending(); });
@@ -1035,6 +1148,7 @@
         } else {
           buildFromMode();
         }
+        saveProgress(false);
       };
       img.src = ev.target.result; // stays local — no network request
     };
@@ -1072,7 +1186,10 @@
 
     state.leaves.forEach(leaf => {
       const cfg = leaf.config;
-      const [cx, cy] = centroidOf(leaf.poly);
+      const off = cfg.labelOffset || [0, 0];
+      const [baseCx, baseCy] = centroidOf(leaf.poly);
+      const cx = clamp(baseCx + off[0], 0, state.W);
+      const cy = clamp(baseCy + off[1], 0, state.H);
       const pct = percentOf(cfg);
       const complete = pct >= 100;
       const nameFontSize = Math.max(12, Math.round(state.W * 0.024));
@@ -1139,11 +1256,198 @@
     downloadCanvasAsPng(canvas, `panel-open_${stamp}.png`);
   });
 
+  // ---------- save / load progress (this device's browser storage only) ----------
+  const STORAGE_KEY = 'panelOpenConsole:progress:v1';
+  const autoSaveToggle = document.getElementById('autoSaveToggle');
+  const saveProgressBtn = document.getElementById('saveProgressBtn');
+  const exportProgressBtn = document.getElementById('exportProgressBtn');
+  const importProgressInput = document.getElementById('importProgressInput');
+  const clearProgressBtn = document.getElementById('clearProgressBtn');
+  const saveStatusText = document.getElementById('saveStatusText');
+  const restoreBar = document.getElementById('restoreBar');
+  const restoreBarText = document.getElementById('restoreBarText');
+  const restoreBtn = document.getElementById('restoreBtn');
+  const discardRestoreBtn = document.getElementById('discardRestoreBtn');
+
+  function formatSavedAt(iso){
+    try{
+      const d = new Date(iso);
+      const pad = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    } catch(err){ return ''; }
+  }
+
+  // Re-encodes the currently loaded base image (already capped at MAX_RES) as a
+  // data URL so the whole session — image included — can be stored/restored
+  // without ever leaving the browser.
+  function imageToDataUrl(mime){
+    const tmp = document.createElement('canvas');
+    tmp.width = state.W; tmp.height = state.H;
+    tmp.getContext('2d').drawImage(state.img, 0, 0, state.W, state.H);
+    return mime === 'image/jpeg' ? tmp.toDataURL('image/jpeg', 0.88) : tmp.toDataURL('image/png');
+  }
+
+  function buildSnapshot(mime){
+    return {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      mode: state.mode,
+      W: state.W, H: state.H,
+      fileName: fileName.textContent,
+      image: state.img ? imageToDataUrl(mime) : null,
+      leaves: state.leaves.map(l => ({ poly: l.poly, config: l.config }))
+    };
+  }
+
+  function updateSaveStatusUI(savedAt){
+    saveStatusText.textContent = savedAt
+      ? `最終保存：${formatSavedAt(savedAt)}（この端末のみ）`
+      : '保存データなし';
+  }
+
+  function persistSnapshot(snapshot){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+      return true;
+    } catch(err){
+      return false; // e.g. quota exceeded
+    }
+  }
+
+  function saveProgress(manual){
+    if(!state.img){
+      if(manual) showToast('先に画像を選択してください');
+      return false;
+    }
+    let snapshot = buildSnapshot('image/png');
+    let ok = persistSnapshot(snapshot);
+    if(!ok){
+      // PNG was too large for localStorage — retry with a smaller JPEG encode
+      snapshot = buildSnapshot('image/jpeg');
+      ok = persistSnapshot(snapshot);
+    }
+    if(ok){
+      updateSaveStatusUI(snapshot.savedAt);
+      if(manual) showToast('保存しました');
+    } else if(manual){
+      showToast('保存に失敗しました（容量オーバー）。ファイル書き出しをお試しください');
+    }
+    return ok;
+  }
+
+  let autoSaveTimer = null;
+  function scheduleAutoSave(){
+    if(!autoSaveToggle || !autoSaveToggle.checked) return;
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(() => saveProgress(false), 700);
+  }
+
+  function applySnapshot(snapshot, opts){
+    opts = opts || {};
+    const finish = () => {
+      state.mode = snapshot.mode || 'random';
+      modeInput.value = state.mode;
+      state.leaves = (snapshot.leaves || []).map(l => ({ poly: l.poly, config: l.config }));
+      state.manualHistory = [];
+      if(snapshot.fileName) fileName.textContent = snapshot.fileName;
+      applyModeVisibility();
+      renderConsole();
+      renderAll();
+      if(opts.toast) showToast('復元しました');
+    };
+    if(snapshot.image){
+      const img = new Image();
+      img.onload = () => {
+        state.img = img;
+        state.W = snapshot.W || img.naturalWidth;
+        state.H = snapshot.H || img.naturalHeight;
+        finish();
+      };
+      img.src = snapshot.image;
+    } else {
+      state.img = null;
+      state.W = snapshot.W || 0;
+      state.H = snapshot.H || 0;
+      finish();
+    }
+  }
+
+  function loadStoredSnapshotRaw(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch(err){ return null; }
+  }
+
+  saveProgressBtn.addEventListener('click', () => saveProgress(true));
+
+  exportProgressBtn.addEventListener('click', () => {
+    if(!state.img){ showToast('先に画像を選択してください'); return; }
+    const snapshot = buildSnapshot('image/png');
+    const blob = new Blob([JSON.stringify(snapshot)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    a.href = url;
+    a.download = `panel-open-progress_${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  importProgressInput.addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try{
+        const snapshot = JSON.parse(ev.target.result);
+        applySnapshot(snapshot, { toast: true });
+        persistSnapshot(snapshot);
+        updateSaveStatusUI(snapshot.savedAt);
+        restoreBar.style.display = 'none';
+      } catch(err){
+        showToast('ファイルの読み込みに失敗しました');
+      }
+    };
+    reader.readAsText(file);
+    importProgressInput.value = '';
+  });
+
+  clearProgressBtn.addEventListener('click', () => {
+    localStorage.removeItem(STORAGE_KEY);
+    updateSaveStatusUI(null);
+    restoreBar.style.display = 'none';
+    showToast('保存データを削除しました');
+  });
+
+  restoreBtn.addEventListener('click', () => {
+    const snapshot = loadStoredSnapshotRaw();
+    if(!snapshot){ restoreBar.style.display = 'none'; return; }
+    applySnapshot(snapshot, { toast: true });
+    updateSaveStatusUI(snapshot.savedAt);
+    restoreBar.style.display = 'none';
+  });
+
+  discardRestoreBtn.addEventListener('click', () => {
+    restoreBar.style.display = 'none';
+  });
+
   // ---------- init ----------
   applyModeVisibility();
   state.leaves = buildGridLeaves(3);
   renderConsole();
   renderAll();
+
+  const storedSnapshot = loadStoredSnapshotRaw();
+  if(storedSnapshot){
+    updateSaveStatusUI(storedSnapshot.savedAt);
+    if(storedSnapshot.image){
+      restoreBarText.textContent = `保存された続きがあります（${formatSavedAt(storedSnapshot.savedAt)}）`;
+      restoreBar.style.display = 'flex';
+    }
+  }
 })();
 </script>
 </body>
